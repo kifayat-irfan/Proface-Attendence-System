@@ -1,6 +1,6 @@
 import time
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from scipy.spatial import distance as dist
 import requests
 from keras.models import load_model
@@ -9,6 +9,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import UniqueConstraint
 
 from flask_migrate import Migrate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from functools import wraps
 import cv2
 import dlib
@@ -16,16 +18,14 @@ import numpy as np
 from geopy.distance import geodesic
 import face_recognition
 
+from security import hash_password, verify_password, is_hashed
+
 
 # Paths to cascade files and emotion model
 current_dir = os.path.dirname(os.path.abspath(__file__))
 cascade_face_path = os.path.join(current_dir, 'haarcascade_frontalface_default.xml')
 cascade_eye_path = os.path.join(current_dir,  'haarcascade_eye.xml')
 emotion_model_path = os.path.join(current_dir, 'emotion_model.h5')
-# Initialize dlib's face detector and shape predictor
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(os.path.join(current_dir, 'shape_predictor_68_face_landmarks.dat'))
-face_rec_model = dlib.face_recognition_model_v1(os.path.join(current_dir, 'dlib_face_recognition_resnet_model_v1.dat'))
 # Load Haar cascade classifiers
 face_cascade = cv2.CascadeClassifier(cascade_face_path)
 eye_cascade = cv2.CascadeClassifier(cascade_eye_path)
@@ -39,6 +39,19 @@ emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutr
 #################################################################################
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-only-change-me')
+# --- Session & cookie hardening ---
+app.config['SESSION_COOKIE_HTTPONLY'] = True   # JS can't read the session cookie (XSS mitigation)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF mitigation for cross-site POSTs
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+# --- Rate limiting (brute-force protection on auth endpoints) ---
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["500 per hour"],
+    storage_uri="memory://",
+)
 # Database configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'site.db')
@@ -58,7 +71,7 @@ class Student(db.Model):
     name = db.Column(db.String(80))
     semester = db.Column(db.String(80))
     email = db.Column(db.String(100), unique=True)
-    password = db.Column(db.String(80))
+    password = db.Column(db.String(255))  # hashed (scrypt); widened from 80
     pic_path = db.Column(db.Text)
     registered_on = db.Column(db.DateTime)
     approved = db.Column(db.Boolean, default=False)  # New column
@@ -72,7 +85,7 @@ class Faculty(db.Model):
     name = db.Column(db.String(80))
     course = db.Column(db.String(80))
     email = db.Column(db.String(100), unique=True)
-    password = db.Column(db.String(80))
+    password = db.Column(db.String(255))  # hashed (scrypt); widened from 80
     is_admin = db.Column(db.Boolean, default=False)
     registered_on = db.Column(db.DateTime)
     approved = db.Column(db.Boolean, default=False)  # New column
@@ -109,13 +122,18 @@ def home():
 
 
 @app.route('/login_student', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login_student():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
-        student = Student.query.filter_by(email=email, password=password).first()
+        student = Student.query.filter_by(email=email).first()
 
-        if student is not None:
+        if student is not None and verify_password(student.password, password):
+            if not is_hashed(student.password):
+                # Transparent upgrade of legacy plaintext password
+                student.password = hash_password(password)
+                db.session.commit()
             
             
             if not student.approved:  # Prevent unapproved students from signing in
@@ -138,14 +156,19 @@ def login_student():
 
 
 @app.route('/login_faculty', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def login_faculty():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
 
-        faculty = Faculty.query.filter_by(email=email, password=password).first()
+        faculty = Faculty.query.filter_by(email=email).first()
 
-        if faculty is not None:
+        if faculty is not None and verify_password(faculty.password, password):
+            if not is_hashed(faculty.password):
+                # Transparent upgrade of legacy plaintext password
+                faculty.password = hash_password(password)
+                db.session.commit()
             # Admin login handling
             if faculty.is_admin:
                 session['fty_logged_in'] = True
@@ -185,7 +208,7 @@ def signup_student():
         existing_user = Student.query.filter_by(email=email).first()
 
         if existing_user is None:
-            new_student = Student(email=email, password=password, rollno=rollno, name=name)
+            new_student = Student(email=email, password=hash_password(password), rollno=rollno, name=name)
             db.session.add(new_student)
             db.session.commit()
 
@@ -209,7 +232,7 @@ def signup_faculty():
         existing_user = Faculty.query.filter_by(email=email).first()
 
         if existing_user is None:
-            new_faculty = Faculty(email=email, password=password, name=name, course=course, is_admin=is_admin)
+            new_faculty = Faculty(email=email, password=hash_password(password), name=name, course=course, is_admin=is_admin)
             db.session.add(new_faculty)
             db.session.commit()
 
@@ -326,7 +349,7 @@ def register_student():
                 name=request.form['name'],
                 semester=request.form['semester'],
                 email=request.form['email'],
-                password=request.form['password'],
+                password=hash_password(request.form['password']),
                 pic_path=f'static/images/users/{request.form["rollno"]}.jpg',
                 registered_on=datetime.now()
             )
@@ -338,6 +361,10 @@ def register_student():
                           f'static/images/users/{request.form["rollno"]}.jpg')
             if 'img_captured' in session:
                 session.pop('img_captured')
+            # Make the new student recognizable immediately (no restart)
+            new_photo = os.path.join(known_faces_dir, f'{request.form["rollno"]}.jpg')
+            if os.path.isfile(new_photo):
+                add_known_face(new_photo)
             flash('Student registration successful', 'success')
             return render_template('register_student.html')
         else:
@@ -377,7 +404,7 @@ def register_faculty():
                 name=request.form['name'],
                 course=request.form['course'],
                 email=request.form['email'],
-                password=request.form['password'],
+                password=hash_password(request.form['password']),
                 is_admin=is_admin,
                 registered_on=datetime.now()
             )
@@ -392,16 +419,19 @@ def register_faculty():
  
 
 @app.route('/faculty_list')
+@is_faculty_logged_in
 def faculty_list():
     faculty = Faculty.query.all()
     return render_template('faculty_info.html', faculty=faculty)
 
 @app.route('/students_list')
+@is_faculty_logged_in
 def students_list():
     students = Student.query.all()
     return render_template('student_info.html', students=students)
 
 @app.route('/lectures_list')
+@is_faculty_logged_in
 def lectures_list():
     # Fetch the list of lectures with associated details
     lectures = db.session.query(
@@ -440,7 +470,7 @@ def edit_student(student_id):
         student.rollno = request.form['rollno']
         student.semester = request.form['semester']
         student.email = request.form['email']
-        student.password = request.form['password']
+        student.password = hash_password(request.form['password'])
         db.session.commit()
         flash('Student details updated successfully', 'success')
         return redirect(url_for('students_list'))
@@ -771,26 +801,51 @@ def detect_faces_and_annotate(frame, rollnos, location, emotions):
     
     return frame
 # Load known faces and their encodings
+# --- Face template registry (dlib models loaded ONCE; absolute paths) ---
+shape_predictor = dlib.shape_predictor(os.path.join(current_dir, "shape_predictor_68_face_landmarks.dat"))
+face_recognition_model = dlib.face_recognition_model_v1(
+    os.path.join(current_dir, "dlib_face_recognition_resnet_model_v1.dat"))
+
 known_face_encodings = []
 known_face_rollnos = []
+known_faces_dir = os.path.join(current_dir, "static", "images", "users")
 
-# Initialize dlib's face detector, shape predictor, and face recognition model
-shape_predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-face_recognition_model = dlib.face_recognition_model_v1("dlib_face_recognition_resnet_model_v1.dat")
 
-# Example: Load known faces from a directory called 'known_faces'
-known_faces_dir = "static/images/users"
-for filename in os.listdir(known_faces_dir):
-    if filename.endswith(".jpg") or filename.endswith(".png"):
-        image_path = os.path.join(known_faces_dir, filename)
+def add_known_face(image_path):
+    """Encode one registered photo and add it to the in-memory registry.
+
+    Returns True on success. Called at startup for every photo and again
+    right after a new student registers — no server restart needed.
+    """
+    try:
         image = dlib.load_rgb_image(image_path)
-        encodings = get_face_encodings(image, shape_predictor, face_recognition_model)
-        if encodings:
-            known_face_encodings.append(encodings[0])
-            rollno = filename.split(".")[0]  # Assuming filename is rollno.jpg or rollno.png
+    except Exception:
+        return False
+    encodings = get_face_encodings(image, shape_predictor, face_recognition_model)
+    if encodings:
+        known_face_encodings.append(encodings[0])
+        rollno = os.path.splitext(os.path.basename(image_path))[0]
+        if rollno not in known_face_rollnos:
             known_face_rollnos.append(rollno)
+        return True
+    return False
+
+
+def load_known_faces():
+    """(Re)load every registered student photo into the face registry."""
+    known_face_encodings.clear()
+    known_face_rollnos.clear()
+    if not os.path.isdir(known_faces_dir):
+        return
+    for filename in os.listdir(known_faces_dir):
+        if filename.lower().endswith((".jpg", ".jpeg", ".png")) and filename != "temp.jpg":
+            add_known_face(os.path.join(known_faces_dir, filename))
+
+
+load_known_faces()
 
 @app.route('/fr_attendance')
+@is_faculty_logged_in
 def mark_face_attendance():
     # Open the camera
     cap = None
