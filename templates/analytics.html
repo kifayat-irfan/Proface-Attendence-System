@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <title>Analytics — ProFace Attendance System</title>
+  <style>
+    .sidebar-link { transition: transform 0.3s ease, background-color 0.3s ease; }
+    .sidebar-link:hover { transform: translateY(-3px); background-color: #d1d5db; }
+    .sidebar { position: fixed; left: 0; top: 0; height: 100%; width: 250px; overflow-y: auto;
+      background-color: #7eb4f1; border-right: 1px solid rgba(25,37,31,.2);
+      box-shadow: 0 4px 8px rgba(0,0,0,.1); padding: 1rem; transition: transform .3s ease;
+      transform: translateX(-100%); z-index: 20; }
+    .sidebar.open { transform: translateX(0); }
+    .hamburger { position: fixed; left: 20px; top: 20px; cursor: pointer; z-index: 30; }
+    .hamburger div { width: 30px; height: 3px; background-color: #fbfbfe; margin: 6px 0; }
+    .kpi { background: #fff; border-radius: .75rem; padding: 1.25rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    .kpi .num { font-size: 2rem; font-weight: 800; color: #1d4ed8; }
+    .kpi .lbl { font-size: .8rem; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+  </style>
+</head>
+<body class="bg-zinc-100">
+  <div class="hamburger" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+    <div></div><div></div><div></div>
+  </div>
+
+  <div class="sidebar">
+    <h2 class="text-xl font-bold mb-6 text-white">ProFace</h2>
+    <nav><ul>
+      <li class="mb-4"><a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">📊 Dashboard</a></li>
+      <li class="mb-4"><a href="/analytics" class="sidebar-link flex items-center text-dark bg-blue-600 text-white p-2 rounded-md">📈 Analytics</a></li>
+      <li class="mb-4"><a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">👤 Register Student</a></li>
+      <li class="mb-4"><a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">📋 View Attendance</a></li>
+      <li class="mb-4"><a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">📝 Mark Attendance</a></li>
+      <li class="mb-4"><a href="/logout" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">⎋ Logout</a></li>
+    </ul></nav>
+  </div>
+
+  <div class="flex-1 flex flex-col md:ml-0">
+    <header class="flex items-center justify-between bg-blue-300 p-4">
+      <h1 class="text-xl font-bold text-white ml-12">📈 Attendance Analytics</h1>
+      <div class="text-white">👤 {{ session.uname }}</div>
+    </header>
+
+    <main class="p-6 max-w-6xl mx-auto w-full">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="mb-3 p-3 rounded-md {{ 'bg-green-100 text-green-800' if cat=='success' else 'bg-yellow-100 text-yellow-800' if cat=='warning' else 'bg-red-100 text-red-800' }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <div class="mb-6 flex items-center gap-3">
+        <label class="font-semibold">Course:</label>
+        <select id="courseSel" class="p-2 rounded-md border" onchange="loadCourse(this.value)">
+          {% for c in courses %}
+            <option value="{{ c }}" {{ 'selected' if c==selected }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+        {% if not courses %}<span class="text-zinc-500">No courses with attendance yet.</span>{% endif %}
+      </div>
+
+      <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="kpi"><div class="num" id="kStudents">–</div><div class="lbl">Students</div></div>
+        <div class="kpi"><div class="num" id="kLectures">–</div><div class="lbl">Lectures held</div></div>
+        <div class="kpi"><div class="num" id="kAvg">–</div><div class="lbl">Avg attendance</div></div>
+        <div class="kpi"><div class="num text-red-600" id="kDef">–</div><div class="lbl">Defaulters (&lt;75%)</div></div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white rounded-xl p-4 shadow">
+          <h3 class="font-bold mb-2">Daily attendance % (last 14 days)</h3>
+          <canvas id="trendChart" height="220"></canvas>
+        </div>
+        <div class="bg-white rounded-xl p-4 shadow">
+          <h3 class="font-bold mb-2">Students present per lecture</h3>
+          <canvas id="lecChart" height="220"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl p-4 shadow">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold">⚠️ Defaulter list (&lt; 75%)</h3>
+          <form method="POST" action="{{ url_for('alert_absentees') }}" onsubmit="return confirm('Send absence alerts to parents of all defaulters?')">
+            <input type="hidden" name="course" id="alertCourse" value="{{ selected }}">
+            <button class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+              {{ '' if smtp_ready else 'disabled title=SMTP not configured' }}>
+              📧 Alert parents
+            </button>
+          </form>
+        </div>
+        {% if not smtp_ready %}
+          <p class="text-sm text-amber-700 mb-2">Email alerts need SMTP config (SMTP_HOST / SMTP_USER / SMTP_PASSWORD env vars). <a class="underline" href="/documentation">Docs</a></p>
+        {% endif %}
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-zinc-500 border-b">
+            <th class="py-2">Roll No</th><th>Name</th><th>Present</th><th>%</th><th>Parent email</th>
+          </tr></thead>
+          <tbody id="defBody"><tr><td colspan="5" class="py-4 text-center text-zinc-400">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+<script>
+let trendC, lecC;
+async function loadCourse(course) {
+  document.getElementById('alertCourse').value = course;
+  const r = await fetch('/api/analytics?course=' + encodeURIComponent(course));
+  const d = await r.json();
+  document.getElementById('kStudents').textContent = d.kpis.students;
+  document.getElementById('kLectures').textContent = d.kpis.lectures;
+  document.getElementById('kAvg').textContent = d.kpis.avg_attendance_pct + '%';
+  document.getElementById('kDef').textContent = d.defaulters.length;
+
+  if (trendC) trendC.destroy();
+  trendC = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: { labels: d.trend.map(t => t.date),
+      datasets: [{ label: '% present', data: d.trend.map(t => t.pct),
+        borderColor: '#1d4ed8', fill: true,
+        backgroundColor: 'rgba(29,78,216,.12)', tension: .3 }] },
+    options: { scales: { y: { min: 0, max: 100 } } }
+  });
+
+  if (lecC) lecC.destroy();
+  lecC = new Chart(document.getElementById('lecChart'), {
+    type: 'bar',
+    data: { labels: d.lectures.map(l => 'L' + l.lecture),
+      datasets: [{ label: 'present', data: d.lectures.map(l => l.present),
+        backgroundColor: '#16a34a' }] },
+  });
+
+  const tb = document.getElementById('defBody');
+  tb.innerHTML = d.defaulters.length ? d.defaulters.map(x =>
+    `<tr class="border-b"><td class="py-2 font-mono">${x.rollno}</td><td>${x.name}</td>` +
+    `<td>${x.present}/${x.total}</td>` +
+    `<td class="font-bold ${x.pct < 50 ? 'text-red-700' : 'text-amber-600'}">${x.pct}%</td>` +
+    `<td>${x.parent_email || '<span class=text-zinc-400>—</span>'}</td></tr>`
+  ).join('') : '<tr><td colspan="5" class="py-4 text-center text-green-700 font-semibold">🎉 No defaulters — everyone above 75%!</td></tr>';
+}
+const sel = document.getElementById('courseSel');
+if (sel && sel.value) loadCourse(sel.value);
+</script>
+</body>
+</html>

@@ -19,6 +19,8 @@ from geopy.distance import geodesic
 import face_recognition
 
 from security import hash_password, verify_password, is_hashed, is_live_face, LIVENESS_THRESHOLD
+from analytics import course_kpis, attendance_trend, defaulter_list, lecture_breakdown
+from notify import send_absence_alert, smtp_configured
 
 
 # Paths to cascade files and emotion model
@@ -85,6 +87,7 @@ class Student(db.Model):
     semester = db.Column(db.String(80))
     email = db.Column(db.String(100), unique=True)
     password = db.Column(db.String(255))  # hashed (scrypt); widened from 80
+    parent_email = db.Column(db.String(120))  # for absence alerts to parents
     pic_path = db.Column(db.Text)
     registered_on = db.Column(db.DateTime)
     approved = db.Column(db.Boolean, default=False)  # New column
@@ -363,6 +366,7 @@ def register_student():
                 semester=request.form['semester'],
                 email=request.form['email'],
                 password=hash_password(request.form['password']),
+                parent_email=request.form.get('parent_email') or None,
                 pic_path=f'static/images/users/{request.form["rollno"]}.jpg',
                 registered_on=datetime.now()
             )
@@ -483,7 +487,10 @@ def edit_student(student_id):
         student.rollno = request.form['rollno']
         student.semester = request.form['semester']
         student.email = request.form['email']
-        student.password = hash_password(request.form['password'])
+        new_pw = request.form.get('password', '').strip()
+        if new_pw:
+            student.password = hash_password(new_pw)
+        student.parent_email = request.form.get('parent_email') or None
         db.session.commit()
         flash('Student details updated successfully', 'success')
         return redirect(url_for('students_list'))
@@ -626,6 +633,66 @@ def download_student_attendance_csv(course):
         mimetype="text/csv",
         headers={"Content-disposition":
                  "attachment; filename=my_attendance.csv"})
+
+
+
+
+# ================= Analytics (Phase 3: Intelligence) =================
+@app.route('/analytics')
+@is_faculty_logged_in
+def analytics_dashboard():
+    courses = _my_courses()
+    selected = request.args.get('course') or (courses[0] if courses else None)
+    return render_template('analytics.html', courses=courses, selected=selected,
+                           smtp_ready=smtp_configured())
+
+
+def _my_courses():
+    """Courses visible to the logged-in faculty (all for admins)."""
+    if session.get('is_admin'):
+        rows = db.session.query(Attendance.course).distinct().all()
+        return sorted(r[0] for r in rows if r[0])
+    name = session.get('name')
+    fac = Faculty.query.filter_by(name=name).first()
+    return [fac.course] if fac and fac.course else []
+
+
+@app.route('/api/analytics')
+@is_faculty_logged_in
+def api_analytics():
+    course = request.args.get('course')
+    if not course:
+        return {"error": "course required"}, 400
+    return {
+        "kpis": course_kpis(db.session, Student, Attendance, course),
+        "trend": attendance_trend(db.session, Student, Attendance, course),
+        "defaulters": defaulter_list(db.session, Student, Attendance, course),
+        "lectures": lecture_breakdown(db.session, Attendance, course),
+    }
+
+
+@app.route('/alert_absentees', methods=['POST'])
+@is_faculty_logged_in
+def alert_absentees():
+    course = request.form.get('course')
+    if not course:
+        flash('No course selected.', 'danger')
+        return redirect(url_for('analytics_dashboard'))
+    sent, skipped = 0, 0
+    for d in defaulter_list(db.session, Student, Attendance, course):
+        ok, _ = send_absence_alert(d["parent_email"], d["name"], course,
+                                   d["pct"], d["present"], d["total"])
+        if ok:
+            sent += 1
+        else:
+            skipped += 1
+    if sent:
+        flash(f'Absence alerts sent to {sent} parent(s).', 'success')
+    if skipped:
+        flash(f'{skipped} skipped (no parent email or SMTP not configured).', 'warning')
+    if not sent and not skipped:
+        flash('No defaulters found - nothing to send.', 'info')
+    return redirect(url_for('analytics_dashboard', course=course))
 
 
 @app.route("/logout")
