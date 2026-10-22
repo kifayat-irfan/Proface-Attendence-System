@@ -18,7 +18,7 @@ import numpy as np
 from geopy.distance import geodesic
 import face_recognition
 
-from security import hash_password, verify_password, is_hashed
+from security import hash_password, verify_password, is_hashed, is_live_face, LIVENESS_THRESHOLD
 
 
 # Paths to cascade files and emotion model
@@ -32,6 +32,19 @@ eye_cascade = cv2.CascadeClassifier(cascade_eye_path)
 
 # Load emotion recognition model
 emotion_model = load_model(emotion_model_path)
+
+# Anti-spoofing CNN: 64x64 RGB face crop -> [P(fake), P(real)].
+# This model shipped with the project but was never wired in - now it is.
+# Trained with flow_from_directory (alphabetical classes), so index 1 = real.
+# If live faces ever score as "fake", flip LIVENESS_REAL_INDEX to 0.
+liveness_cnn = load_model(os.path.join(current_dir, 'liveness_model.h5'))
+LIVENESS_INPUT_SIZE = (64, 64)
+LIVENESS_REAL_INDEX = 1
+# LIVENESS_THRESHOLD + is_live_face() live in security.py (unit-tested).
+
+# Face-detection speed: run the HOG detector on a downscaled frame
+# (~4x faster at 0.5); rectangles are mapped back to full-frame coordinates.
+FACE_DETECT_SCALE = 0.5
 
 
 # Emotion labels
@@ -622,27 +635,41 @@ def logout():
     return redirect(url_for('index'))
 
 # Emotion detection function
-def detect_emotion(image):
-    # Preprocess image as required by the emotion detection model
-    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    face_resized = cv2.resize(gray_image, (48, 48))
-    face_array = np.expand_dims(face_resized, axis=0)
-    face_array = np.expand_dims(face_array, axis=-1) / 255.0
-    
-    # Predict using the emotion model
-    prediction = emotion_model.predict(face_array)
-    emotion_index = np.argmax(prediction)
-    emotion = emotion_labels[emotion_index]
-    
-    return emotion
+# --- Vision pipeline: one shared detector, one detection pass per frame ---
+_face_detector = dlib.get_frontal_face_detector()
 
 
+def detect_faces(image, scale=1.0):
+    """Detect faces with dlib HOG. With scale < 1, detection runs on a
+    downscaled copy for speed and rectangles are mapped back to full-frame
+    coordinates."""
+    if scale != 1.0:
+        h, w = image.shape[:2]
+        small = cv2.resize(image, (max(1, int(w * scale)), max(1, int(h * scale))))
+        faces = _face_detector(small, 1)
+        inv = 1.0 / scale
+        return [dlib.rectangle(int(f.left() * inv), int(f.top() * inv),
+                               int(f.right() * inv), int(f.bottom() * inv))
+                for f in faces]
+    return _face_detector(image, 1)
 
 
-def detect_faces(image):
-    detector = dlib.get_frontal_face_detector()
-    faces = detector(image, 1)
-    return faces
+def detect_emotion(face_crop_bgr):
+    """Emotion label for one BGR face crop (never the whole frame)."""
+    gray = cv2.cvtColor(face_crop_bgr, cv2.COLOR_BGR2GRAY)
+    resized = cv2.resize(gray, (48, 48))
+    arr = np.expand_dims(np.expand_dims(resized, axis=0), axis=-1) / 255.0
+    return emotion_labels[int(np.argmax(emotion_model.predict(arr, verbose=0)))]
+
+
+def cnn_liveness_score(face_crop_bgr):
+    """P(real person) from the anti-spoofing CNN for one BGR face crop."""
+    rgb = cv2.cvtColor(face_crop_bgr, cv2.COLOR_BGR2RGB)
+    resized = cv2.resize(rgb, LIVENESS_INPUT_SIZE)
+    arr = np.expand_dims(resized.astype("float32") / 255.0, axis=0)
+    probs = liveness_cnn.predict(arr, verbose=0)[0]
+    return float(probs[LIVENESS_REAL_INDEX])
+
 
 def get_face_encodings(image, shape_predictor, face_recognition_model):
     faces = detect_faces(image)
@@ -653,24 +680,29 @@ def get_face_encodings(image, shape_predictor, face_recognition_model):
         encodings.append(encoding)
     return encodings
 
-def compare_faces(known_encodings, face_encoding):
-    distances = np.linalg.norm(known_encodings - face_encoding, axis=1)
-    match = np.any(distances <= 0.6)
-    return match, distances
 
-def recognize_face(frame):
+def match_encoding(face_encoding):
+    """Best-match roll number for one 128-d encoding, or None."""
+    if not known_face_encodings:
+        return None
+    distances = np.linalg.norm(np.array(known_face_encodings) - face_encoding, axis=1)
+    if np.any(distances <= 0.6):
+        return known_face_rollnos[int(np.argmin(distances))]
+    return None
+
+
+def recognize_faces(frame):
+    """Single detection pass per frame. Returns a list of dicts
+    {rollno|None, rect, encoding} shared by recognition AND annotation, so the
+    on-screen overlay can never mismatch the recognized identities."""
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    face_encodings = get_face_encodings(rgb_frame, shape_predictor, face_recognition_model)
-    
-    recognized_rollnos = []
-    for face_encoding in face_encodings:
-        match, distances = compare_faces(np.array(known_face_encodings), face_encoding)
-        if match:
-            best_match_index = np.argmin(distances)
-            rollno = known_face_rollnos[best_match_index]
-            recognized_rollnos.append(rollno)
-    
-    return recognized_rollnos
+    faces = detect_faces(rgb_frame, scale=FACE_DETECT_SCALE)
+    results = []
+    for face in faces:
+        shape = shape_predictor(rgb_frame, face)
+        encoding = np.array(face_recognition_model.compute_face_descriptor(rgb_frame, shape))
+        results.append({"rollno": match_encoding(encoding), "rect": face, "encoding": encoding})
+    return results
 
 KARAK_LOCATION = (32.193, 70.0633)
 
@@ -766,39 +798,61 @@ def detect_liveness(shape):
     return blink_detector.is_live()  # Check if there has been a blink recently
 
 # Update the detect_faces_and_annotate function to include liveness detection
-def detect_faces_and_annotate(frame, rollnos, location, emotions):
+def detect_faces_and_annotate(frame, detections, location):
+    """Annotate each detection with roll no, emotion and liveness.
+
+    Works from the single detection pass produced by recognize_faces(), so the
+    overlay always matches the recognized identities. Per-face results
+    (emotion, CNN score, live flag) are written back into the detection dicts
+    for the marking loop to use.
+
+    Liveness is combined: the anti-spoofing CNN scores the face crop every
+    frame, and the EAR blink detector confirms a recent blink. A face counts
+    as live if EITHER fires — the CNN catches printed photos, the blink check
+    catches replayed videos.
+    """
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    faces = detect_faces(rgb_frame)
-    
-    # Annotate each detected face
-    for (i, face) in enumerate(faces):
-        x1, y1, x2, y2 = face.left(), face.top(), face.right(), face.bottom()
-        rollno = rollnos[i] if i < len(rollnos) else "Unknown"
-        emotion = emotions[i] if i < len(emotions) else "Unknown"
-        
-        # Get shape for liveness detection
+
+    for det in detections:
+        face = det["rect"]
+        x1, y1 = max(0, face.left()), max(0, face.top())
+        x2, y2 = face.right(), face.bottom()
+        crop = frame[y1:y2, x1:x2]
+        rollno = det["rollno"] if det["rollno"] else "Unknown"
+
+        if crop.size:
+            emotion = detect_emotion(crop)
+            cnn_score = cnn_liveness_score(crop)
+        else:
+            emotion, cnn_score = "Unknown", 0.0
         shape = shape_predictor(rgb_frame, face)
-        liveness = detect_liveness(shape)
-        liveness_status = "Live" if liveness else "Fake"
-        # Lookup student name based on roll number
+        blink_live = detect_liveness(shape)
+        live = is_live_face(blink_live, cnn_score)
+
+        det["emotion"] = emotion
+        det["cnn_score"] = cnn_score
+        det["live"] = live
+
         student_name = "Unknown Student"
         if rollno != "Unknown":
             student = Student.query.filter_by(rollno=rollno).first()
             if student:
                 student_name = student.name
-        
-        # Draw rectangle around the face
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        
-        # Annotate roll number, emotion, and liveness
-        cv2.putText(frame, f'Name: {student_name}', (x1, y1 - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-        cv2.putText(frame, f'Roll No: {rollno}', (x1, y1 - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-        cv2.putText(frame, f'Emotion: {emotion}', (x1, y1 - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-        cv2.putText(frame, f'Liveness: {liveness_status}', (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-    
-    # Display the location text in the upper left corner
-    cv2.putText(frame, f'Location: {location}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-    
+
+        box_color = (0, 255, 0) if live else (0, 0, 255)
+        liveness_status = "Live" if live else "Fake - not marked"
+        cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
+        cv2.putText(frame, f'Name: {student_name}', (x1, y1 - 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, box_color, 2)
+        cv2.putText(frame, f'Roll No: {rollno}', (x1, y1 - 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, box_color, 2)
+        cv2.putText(frame, f'Emotion: {emotion}', (x1, y1 - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, box_color, 2)
+        cv2.putText(frame, f'Liveness: {liveness_status} ({cnn_score:.2f})', (x1, y1),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, box_color, 2)
+
+    cv2.putText(frame, f'Location: {location}', (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
     return frame
 # Load known faces and their encodings
 # --- Face template registry (dlib models loaded ONCE; absolute paths) ---
@@ -864,63 +918,72 @@ def mark_face_attendance():
     # Set to track marked roll numbers
     marked_rollnos = set()
 
+    # Location is (approximately) static for a marking session: fetch it ONCE,
+    # not on every frame (previously an HTTP request per frame).
+    location_data = get_user_location()
+    location = location_data.get('location', 'Unknown')
+    location_str = f"{location[0]},{location[1]}" if location != 'Unknown' else 'Unknown'
+
     while True:
         ret, frame = cap.read()
         if not ret:
             print("Failed to capture image.")
             break
 
-        # Get user location
-        location_data = get_user_location()
-        location = location_data.get('location', 'Unknown')
-        rollnos = recognize_face(frame)
-        emotions = [detect_emotion(frame) for _ in rollnos]
+        # Single detection pass: recognition + rects shared with the overlay
+        detections = recognize_faces(frame)
 
-        # Convert location tuple to string
-        location_str = f"{location[0]},{location[1]}" if location != 'Unknown' else 'Unknown'
+        # Annotate first (fills in emotion / CNN score / live flag per face)
+        processed_frame = detect_faces_and_annotate(frame, detections, location)
 
-        if rollnos:
-            for rollno in rollnos:
-                if rollno not in marked_rollnos:
-                    # Lookup student name based on roll number
-                    student = Student.query.filter_by(rollno=rollno).first()
-                    student_name = student.name if student else 'Unknown Student'
-                    
-                    # Get the current lecture number and course from the session or database
-                    lecture_number = session.get('lecture_no', 'Unknown Lecture')
-                    course = session.get('course', 'Unknown')
-                    marked_by = session.get('name', 'Unknown')
+        for det in detections:
+            rollno = det["rollno"]
+            if not rollno or rollno in marked_rollnos:
+                continue
+            if not det.get("live", False):
+                # Anti-spoofing gate: never mark a face the liveness checks reject
+                flash(f"Roll number {rollno}: liveness check failed - not marked.", 'warning')
+                marked_rollnos.add(rollno)  # don't nag every frame
+                continue
+            # Lookup student name based on roll number
+            student = Student.query.filter_by(rollno=rollno).first()
+            student_name = student.name if student else 'Unknown Student'
 
-                    # Check if attendance already marked for this rollno, lecture_no, and marked_date
-                    existing_attendance = Attendance.query.filter_by(
-                        rollno=rollno,
-                        lecture_no=lecture_number,
-                        marked_date=datetime.now().date()
-                    ).first()
+            # Get the current lecture number and course from the session or database
+            lecture_number = session.get('lecture_no', 'Unknown Lecture')
+            course = session.get('course', 'Unknown')
+            marked_by = session.get('name', 'Unknown')
 
-                    if not existing_attendance:
-                        # Mark attendance
-                        attendance = Attendance(
-                            name=student_name,
-                            rollno=rollno,
-                            course=course,
-                            lecture_no=lecture_number,
-                            marked_by=marked_by,
-                            marked_date=datetime.now().date(),
-                            marked_time=datetime.now().time(),
-                            location=location_str
-                        )
-                        db.session.add(attendance)
-                        db.session.commit()
-                        flash(f"Attendance marked for roll number {rollno}", 'success')
+            # Check if attendance already marked for this rollno, lecture_no, and marked_date
+            existing_attendance = Attendance.query.filter_by(
+                rollno=rollno,
+                lecture_no=lecture_number,
+                marked_date=datetime.now().date()
+            ).first()
 
-                        # Add roll number to the set to prevent re-marking
-                        marked_rollnos.add(rollno)
-                    else:
-                        flash(f"Roll number {rollno} has already been marked for this lecture.", 'info')
+            if not existing_attendance:
+                # Mark attendance
+                attendance = Attendance(
+                    name=student_name,
+                    rollno=rollno,
+                    course=course,
+                    lecture_no=lecture_number,
+                    marked_by=marked_by,
+                    marked_date=datetime.now().date(),
+                    marked_time=datetime.now().time(),
+                    location=location_str
+                )
+                db.session.add(attendance)
+                db.session.commit()
+                flash(f"Attendance marked for roll number {rollno}", 'success')
+
+                # Add roll number to the set to prevent re-marking
+                marked_rollnos.add(rollno)
+            else:
+                flash(f"Roll number {rollno} has already been marked for this lecture.", 'info')
+                marked_rollnos.add(rollno)
 
         # Display the frame with annotations
-        processed_frame = detect_faces_and_annotate(frame, rollnos, location, emotions)
         if processed_frame is not None:
             cv2.imshow('Facial Recognition with Liveness and Emotion Detection', processed_frame)
 

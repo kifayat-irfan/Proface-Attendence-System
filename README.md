@@ -39,10 +39,10 @@ A complete, production-style **facial recognition attendance system** built with
 ## Key Features
 
 **AI & Computer Vision**
-- **Face recognition attendance** — dlib HOG detector + 68-point landmarks + ResNet-29 (128-d embeddings); matches against registered student photos
-- **Emotion detection** — Keras CNN classifies 7 emotions (Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral) live on each recognized face
-- **Liveness anti-spoofing** — eye-aspect-ratio (EAR) blink detection rejects photos/screens held up to the camera
-- **Geofencing** — IP-based location checked against campus coordinates; attendance records carry the marking location
+- **Face recognition attendance** — dlib HOG detector + 68-point landmarks + ResNet-29 (128-d embeddings); matches against registered student photos. Detection runs on a downscaled frame (~4x faster) with a single detection pass shared between recognition and the on-screen overlay
+- **Emotion detection** — Keras CNN classifies 7 emotions (Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral) on each detected face crop
+- **Dual liveness anti-spoofing** — a trained anti-spoofing CNN (`liveness_model.h5`) scores every face crop *plus* eye-aspect-ratio (EAR) blink detection; a face is marked only if it passes the combined check, so printed photos and replayed videos are rejected
+- **Geofencing** — IP-based location (fetched once per marking session, not per frame) checked against campus coordinates; attendance records carry the marking location
 
 **Web Application**
 - **Three roles** — Student, Faculty, and Admin panels, each with its own dashboard
@@ -61,7 +61,7 @@ A complete, production-style **facial recognition attendance system** built with
 | Database | SQLite + SQLAlchemy + Flask-Migrate (Alembic) |
 | Face recognition | dlib (HOG + 68 landmarks + ResNet-29), `face_recognition` |
 | Emotion | Keras CNN (`emotion_model.h5`) |
-| Liveness | Eye-aspect-ratio blink detection (OpenCV) |
+| Liveness | Eye-aspect-ratio blink detection (OpenCV) + anti-spoofing CNN (`liveness_model.h5`) |
 | Location | geopy + ipinfo.io geolocation |
 
 ## Project Structure

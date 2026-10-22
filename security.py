@@ -36,3 +36,15 @@ def verify_password(stored: str, plain: str) -> bool:
     # Legacy plaintext comparison (constant-time not critical here since
     # the value is upgraded to a hash immediately after a successful login).
     return stored == plain
+
+
+# --- Liveness (anti-spoofing) trust policy ---
+# A face counts as live if EITHER check fires: the anti-spoofing CNN catches
+# printed photos on a single frame, while the EAR blink detector catches
+# replayed videos over time.
+LIVENESS_THRESHOLD = 0.65  # CNN P(real) at/above this counts as live
+
+
+def is_live_face(blink_live, cnn_score, threshold=LIVENESS_THRESHOLD):
+    """Combined liveness verdict (pure function, unit-tested)."""
+    return bool(blink_live) or cnn_score >= threshold

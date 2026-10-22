@@ -45,3 +45,24 @@ def test_two_hashes_differ():
     # Salting: same password -> different hashes, both verify
     assert hash_password("same") != hash_password("same")
     assert verify_password(hash_password("same"), "same") is True
+
+
+# --- Liveness trust policy ---
+from security import is_live_face, LIVENESS_THRESHOLD
+
+
+def test_cnn_alone_can_pass_liveness():
+    assert is_live_face(False, 0.95) is True
+
+
+def test_blink_alone_can_pass_liveness():
+    assert is_live_face(True, 0.10) is True
+
+
+def test_both_failing_rejects():
+    assert is_live_face(False, 0.10) is False
+
+
+def test_threshold_boundary():
+    assert is_live_face(False, LIVENESS_THRESHOLD) is True
+    assert is_live_face(False, LIVENESS_THRESHOLD - 0.01) is False
