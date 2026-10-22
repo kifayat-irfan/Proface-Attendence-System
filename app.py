@@ -38,7 +38,7 @@ emotion_model = load_model(emotion_model_path)
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 #################################################################################
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '3e9d5f1b7c4a8d6f3b2e0e1f2a4b5c6d'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-only-change-me')
 # Database configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'site.db')

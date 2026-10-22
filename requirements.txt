@@ -1,0 +1,22 @@
+# Web framework
+Flask>=2.3
+Flask-SQLAlchemy>=3.0
+Flask-Migrate>=4.0
+
+# Computer vision & face recognition
+opencv-python>=4.8
+dlib>=19.24
+face_recognition>=1.3
+numpy>=1.24
+scipy>=1.10
+
+# Deep learning (emotion + liveness models)
+tensorflow>=2.13
+# NOTE: dlib and face_recognition need a C++ compiler + CMake to build.
+# On Windows, install CMake and Visual Studio Build Tools first.
+# See README "Prerequisites".
+
+# Utilities
+geopy>=2.3
+requests>=2.31
+alembic>=1.12
