@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Proface Attendance System</title>
+</head>
+<body class="dark">
+  <style>
+    /* Custom style for sidebar link animation */
+    .sidebar-link {
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sidebar-link:hover {
+      transform: translateY(-3px);
+      background-color: #d1d5db; /* Tailwind color for hover */
+    }
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 250px;
+    overflow-y: auto;
+    background-color: #7eb4f1;
+    border-right: 1px solid rgba(25, 37, 31, 0.2); /* Light border with opacity */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    transition: transform 0.3s ease;
+    transform: translateX(-100%);
+    z-index: 20; /* Ensure sidebar is above the main content */
+  }
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 30; /* Ensure hamburger icon is above the sidebar */
+    }
+
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    .hamburger.hidden {
+      display: none;
+    }
+    
+  </style>
+</head>
+<body class="dark">
+   <!-- Hamburger Icon -->
+   <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+  <div class="flex h-screen">
+     <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <br>
+    <br>
+    <div class="header">
+      <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
+    </div>
+    <br>
+    <hr>
+      <br>
+      
+      <nav>
+        <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
+        <ul id="sidebarLinks">
+
+          <li class="mb-4">
+            <a href='/' class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
+            Home
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/student" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
+              Dashboard
+            </a>
+          </li>
+         
+          <li class="mb-4">
+            <a href="/my_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
+              View Attendance
+            </a>
+          </li>
+        
+          
+          
+          <li class="mb-4">
+            <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
+              Visit Site
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/documentation" class="sidebar-link flex items-center text-zinc-700 dark bg-blue-200 dark:text-zinc-700 dark hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="documentation-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📚" class="mr-2" />
+              Documentation
+            </a>
+          </li>
+          
+        </ul>
+      </nav>
+      <hr>
+      <footer>
+        <p class="text-zinc-600 dark:text-zinc-400">
+          © 2024 Proface Attendance System. All rights reserved.
+        </p>
+      </footer>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+      <!-- Header -->
+      <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 dark p-4">
+        <h1 class="text-xl font-bold"> </h1>
+        <div class="flex items-center space-x-4">
+          
+          <button id="notificationButton" class="p-2  rounded-full">
+            <img src="https://openui.fly.dev/openui/24x24.svg?text=🔔" alt="Notification" class="w-6 h-6">
+          </button>
+          <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
+          <div class="nav-item">
+            <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Section -->
+      <main class="flex-1 p-6 bg-zinc-100 white:bg-zinc-900">
+        <div class="bg-zinc-200 dark:bg-blue-300 dark p-8 rounded-md text-center">
+          <h2 class="text-2xl font-bold text-zinc-800 dark:text-zinc-800 dark">Welcome to Proface Attendance System</h2>
+        </div>
+
+          <div class="col-md-12">
+            
+              
+              <div class="card">
+                <div class="card-header">
+                  <h5 class="text-lg font-semibold text-center">Overall Attendance per Course</h5>
+                </div>
+                <div class="card-body">
+                  <div class="row">
+                    {% for course in courses %}
+                    <div class="col-sm-4 mb-4">
+                      <div class="card border border-blue-200 text-center mb-4">
+                        <div class="card-body">
+                          <h5 class="card-title">{{ course[0] }} <i class="fa fa-book" aria-hidden="true"></i></h5>
+                          
+                          <p class="card-text">{{ lectures_count[loop.index-1] }}</p>
+                        </div>
+                      </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <hr>
+                
+
+              </div>
+              
+              </main>
+            </div>
+          </div>
+            <!-- Notifications Dropdown -->
+  <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border rounded-md shadow-lg">
+    <ul id="notificationsList" class="p-4">
+      <!-- Notifications will be appended here -->
+    </ul>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    function searchFunction() {
+      const input = document.getElementById('searchInput');
+      const filter = input.value.toLowerCase();
+      const ul = document.getElementById('sidebarLinks');
+      const li = ul.getElementsByTagName('li');
+
+      for (let i = 0; i < li.length; i++) {
+        const a = li[i].getElementsByTagName('a')[0];
+        if (a.innerHTML.toLowerCase().indexOf(filter) > -1) {
+          li[i].style.display = '';
+        } else {
+          li[i].style.display = 'none';
+        }
+      }
+    }
+             // Example function to fetch notifications from the server
+    function fetchNotifications() {
+      // Example notifications data
+      const notifications = [
+        { message: 'You have a new message from faculty.', timestamp: '2024-07-29 12:00' },
+        { message: 'Your attendance has been marked.', timestamp: '2024-07-29 11:00' }
+      ];
+
+      const notificationsList = document.getElementById('notificationsList');
+      notificationsList.innerHTML = '';
+
+      notifications.forEach(notification => {
+        const li = document.createElement('li');
+        li.className = 'mb-2';
+        li.innerHTML = `
+          <div class="p-2 bg-gray-100 rounded-md">
+            <p>${notification.message}</p>
+            <p class="text-sm text-gray-500">${notification.timestamp}</p>
+          </div>
+        `;
+        notificationsList.appendChild(li);
+      });
+
+      document.getElementById('notificationDropdown').classList.remove('hidden');
+    }
+
+    document.getElementById('notificationButton').addEventListener('click', fetchNotifications);
+  </script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Proface Attendance System</title>
+  <style>
+    /* Custom styles for sidebar */
+    .sidebar-link {
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sidebar-link:hover {
+      transform: translateY(-3px);
+      background-color: #d1d5db; /* Tailwind color for hover */
+    }
+
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 250px;
+      overflow-y: auto;
+      background-color: #7eb4f1;
+      border-right: 1px solid rgba(25, 37, 31, 0.2);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      transition: transform 0.3s ease;
+      transform: translateX(-100%);
+      z-index: 20;
+    }
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 30;
+    }
+
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    .hamburger.hidden {
+      display: none;
+    }
+
+    /* Custom styles for boxes */
+    .info-card, .feature-box {
+      transition: all 0.3s ease-in-out;
+      background-color: #e3f2fd;
+      border: 2px solid #90caf9;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      opacity: 0;
+      transform: translateX(100%);
+    }
+
+    .info-card.show, .feature-box.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .feature-box:hover {
+      background-color: #bbdefb;
+      transform: scale(1.05);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .container-wrapper {
+      margin-top: 50px;
+    }
+
+    .with-sidebar .info-card, .with-sidebar .feature-box {
+      transform: translateX(250px);
+    }
+
+    .full .info-card, .full .feature-box {
+      transform: translateX(0);
+    }
+  </style>
+</head>
+<body class="dark">
+  <!-- Hamburger Icon -->
+  <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar">
+      <br><br>
+      <div class="header">
+        <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
+      </div>
+      <br>
+      <hr>
+        <br>
+      <nav>
+        <ul id="sidebarLinks">
+          <li class="mb-4">
+            <a href="/home" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
+              Home
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
+              Dashboard
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤" class="mr-2" />
+              Register Student
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
+              View Attendance
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="typography-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📝" class="mr-2" />
+              Mark Attendance
+            </a>
+          </li>
+          {% if session.is_admin %}
+          <li class="mb-4">
+            <a href="/faculty_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🧑‍🏫" class="mr-2" />
+              Register Faculty
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="{{ url_for('approve_requests') }}" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=✓" class="mr-2" />
+              Approve requests
+            </a>
+          </li>
+          {% endif %}
+          <li class="mb-4">
+            <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
+              Visit Site
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/documentation" class="sidebar-link flex items-center text-zinc-700 bg-blue-200 dark:text-zinc-700 p-2 rounded-md">
+              ℹ️ About us
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <hr>
+      <footer>
+        <p class="text-zinc-600 dark:text-zinc-400">
+          © 2024 Proface Attendance System. All rights reserved.
+        </p>
+      </footer>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="flex-1 flex flex-col">
+      <!-- Header -->
+      <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 p-4">
+        <h1 class="text-xl font-bold"> </h1>
+        <div class="flex items-center space-x-4">
+          <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
+          <button class="relative">
+            🔔
+            <span class="absolute top-0 right-0 inline-block "></span>
+          </button>
+          <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
+          <div class="nav-item">
+            <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <div class="flex-1 p-4 container-wrapper" id="content">
+        <div class="info-card show">
+          <h2 class="text-xl font-bold mb-2">Attendance System</h2>
+          <p>Our smart facial recognition-based attendance system ensures accurate and efficient management of student and faculty attendance.</p>
+        </div>
+        <div class="feature-box show">
+          <h3 class="text-lg font-bold mb-2">Real-Time Recognition</h3>
+          <p>Utilizes advanced algorithms for real-time facial recognition, liveness detection, emotion analysis and location verification.</p>
+        </div>
+        <div class="feature-box show">
+          <h3 class="text-lg font-bold mb-2">Easy Integration</h3>
+          <p>Seamlessly integrates with existing school management systems.</p>
+        </div>
+        <div class="feature-box show">
+          <h3 class="text-lg font-bold mb-2">Secure & Private</h3>
+          <p>Our system is designed with data privacy and security as top priorities.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Function to toggle sidebar
+    function toggleSidebar() {
+      var sidebar = document.getElementById('sidebar');
+      var mainContent = document.getElementById('mainContent');
+      sidebar.classList.toggle('open');
+      mainContent.classList.toggle('with-sidebar');
+      document.querySelectorAll('.info-card, .feature-box').forEach((box) => {
+        if (sidebar.classList.contains('open')) {
+          box.classList.add('with-sidebar');
+        } else {
+          box.classList.remove('with-sidebar');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

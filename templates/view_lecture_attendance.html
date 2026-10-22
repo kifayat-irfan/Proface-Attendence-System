@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Proface Attendance System</title>
+  <style>
+    /* Custom style for sidebar link animation */
+    .sidebar-link {
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sidebar-link:hover {
+      transform: translateY(-3px);
+      background-color: #d1d5db; /* Tailwind color for hover */
+    }
+    .sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 250px;
+  overflow-y: auto;
+  background-color: #7eb4f1;
+  border-right: 1px solid rgba(25, 37, 31, 0.2); /* Light border with opacity */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  transition: transform 0.3s ease;
+  transform: translateX(-100%);
+  z-index: 20; /* Ensure sidebar is above the main content */
+}
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    
+
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 30; /* Ensure hamburger icon is above the sidebar */
+    }
+
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    .hamburger.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body class="dark">
+   <!-- Hamburger Icon -->
+   <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+  <div class="flex h-screen">
+    
+     <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <br>
+    <br>
+    <div class="header">
+      <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
+    </div>
+    <br>
+    <hr>
+      <br>
+      <nav>
+        <ul id="sidebarLinks">
+          <li class="mb-4">
+            <a href="/home"  class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
+            Home
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
+              Dashboard
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤" class="mr-2" />
+              Register Student
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
+              View Attendance
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="typography-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📝" class="mr-2" />
+              Mark Attendance
+            </a>
+          </li>
+          {% if session.is_admin %}
+          <li class="mb-4">
+            <a href="/faculty_registration" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🧑‍🏫" class="mr-2" />
+              Register Faculty
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="{{ url_for('approve_requests') }}" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=✓" class="mr-2" />
+              Approve requests
+            </a>
+          </li>
+          {% endif %}
+          <li class="mb-4">
+            <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
+              Visit Site
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <hr>
+      <footer>
+        <p class="text-zinc-600 dark:text-zinc-400">
+          © 2024 Proface Attendance System. All rights reserved.
+        </p>
+      </footer>
+  </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+      <!-- Header -->
+      <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 dark p-4">
+        <h1 class="text-xl font-bold"> </h1>
+        <div class="flex items-center space-x-4">
+          <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
+          <button class="relative">
+            🔔
+             <span class="absolute top-0 right-0 inline-block "></span>
+          </button>
+          <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
+          <div class="nav-item">
+            <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
+          </div>
+        </div>
+      </header>
+      <main class="flex-1 p-6 bg-zinc-100 white:bg-zinc-900">
+      <style>
+        
+       
+  .container {
+    margin: 0 auto;
+    padding: 20px;
+    max-width: 1200px;
+    
+}
+
+.card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: width 0.3s ease, margin-left 0.3s ease;
+    width: calc(100% - 40px); /* Initial width minus padding */
+    margin-left: 40px; /* Initial margin to center the container */
+}
+.card.sidebar-open {
+    width: calc(100% - 300px); /* Reduced width to accommodate sidebar */
+    margin-left: 290px; /* Adjusted margin */
+}
+
+.card-header {
+    background-color: #7eb4f1;
+    color: #fff;
+    padding: 15px;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 24px;
+    text-align: center;
+}
+
+.card-body {
+    padding: 20px;
+    overflow-x: auto;
+}
+
+.card-footer {
+    background-color: #f8f9fa;
+    padding: 10px;
+    text-align: center;
+}
+
+/* Table styles */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th, .table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.table thead {
+    background-color: #f4f4f4;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #f9f9f9;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Pagination styles */
+.pagination {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.page-item {
+    margin: 0 2px;
+}
+
+.page-link {
+    display: block;
+    padding: 10px 15px;
+    font-size: 16px;
+    color: #7eb4f1;
+    text-decoration: none;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.page-link:hover {
+    background-color: #7eb4f1;
+    color: #fff;
+}
+
+/* Button styles */
+.btn-download {
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 16px;
+    color: #fff;
+    background-color: #28a745;
+    border: 1px solid #28a745;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.btn-download:hover {
+    background-color: #218838;
+    color: #fff;
+}
+        </style>
+      <div class="container">
+      <div class="card">
+      <div class="card-header">
+          <h4 class="card-title"><strong>Attendance for Each Lecture</strong></h4>
+      </div>
+      <div class="card-body">
+          {% if attendance is not none %}
+              <nav aria-label="Page navigation example">
+                  <ul class="pagination">
+                      {% for lec in unique_lect_no %}
+                          <li class="page-item">
+                              <a class="page-link" href="{{ url_for('view_lectures_attendance', lecture=lec[0]) }}">Lecture {{ lec[0] }}</a>
+                          </li>
+                      {% endfor %}
+                  </ul>
+              </nav>
+
+              <hr>
+              <table class="table">
+                  <thead>
+                      <tr>
+                          <th scope="col">Roll No.</th>
+                          <th scope="col">Name</th>
+                          <th scope="col">Course</th>
+                          <th scope="col">Lecture No.</th>
+                          <th scope="col">Marked By</th>
+                          <th scope="col">Marking Date</th>
+                          <th scope="col">Marking Time</th>
+                          <th scope="col">Location</th>
+                          <th scope="col">Actions</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      {% for a in attendance %}
+                          <tr>
+                              <td>{{ a.rollno }}</td>
+                              <td>{{ a.name }}</td>
+                              <td>{{ a.course }}</td>
+                              <td>{{ a.lecture_no }}</td>
+                              <td>{{ a.marked_by }}</td>
+                              <td>{{ a.marked_date }}</td>
+                              <td>{{ a.marked_time }}</td>
+                              <td>{{ a.location }}</td>
+                              <td>
+                                <a href="{{ url_for('edit_attendance', att_id=a.att_id) }}" class="btn btn-edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form action="{{ url_for('delete_attendance', att_id=a.att_id) }}" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn btn-delete" style="border: none; background: none; cursor: pointer;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                            
+                          </tr>
+                      {% endfor %}
+                  </tbody>
+              </table>
+              {% if not session.is_admin %}
+                  {% if request.args.get('lecture') is not none %}
+                  <a href="/facultydownloadcsv/{{ request.args.get('lecture') }}" class="btn btn-download">
+                      Download Attendance File for Lecture {{ request.args.get('lecture') }}
+                  </a>
+                  {% else %}
+                  <a href="/facultydownloadcsv/1" class="btn btn-download">
+                      Download Attendance File for Lecture 1
+                  </a>
+                  {% endif %}
+              {% endif %}
+          {% else %}
+              <h5 class="text text-danger">No Records Available</h5>
+          {% endif %}
+      </div>
+      <div class="card-footer">
+      </div>
+  </div>
+</div>
+</div>
+<hr>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</div>
+</div>
+<script>
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const card = document.querySelector('.card');
+
+    sidebar.classList.toggle('open');
+    card.classList.toggle('sidebar-open');
+}
+  function searchFunction() {
+              const input = document.getElementById('searchInput');
+              const filter = input.value.toLowerCase();
+              const ul = document.getElementById('sidebarLinks');
+              const li = ul.getElementsByTagName('li');
+        
+              for (let i = 0; i < li.length; i++) {
+                const a = li[i].getElementsByTagName('a')[0];
+                if (a.innerHTML.toLowerCase().indexOf(filter) > -1) {
+                  li[i].style.display = '';
+                } else {
+                  li[i].style.display = 'none';
+                }
+              }
+            }
+</script>
+</body>
+</html>
+
+

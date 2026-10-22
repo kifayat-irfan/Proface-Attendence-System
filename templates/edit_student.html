@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Student</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Shadows+Into+Light&display=swap');
+        
+        body {
+            background: #f0e6d6; /* A warm, diary-like background color */
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png'); /* Adding a subtle paper texture */
+        }
+        .container {
+            background: #fff;
+            max-width: 500px;
+            width: 100%;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border: 2px solid #7eb4f1; /* Giving the container a subtle border */
+            background-image: url('https://www.transparenttextures.com/patterns/linen.png'); /* Adding a subtle linen texture */
+            box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #5a4630;
+            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            border-bottom: 2px solid #b2967d;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #5a4630;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #7eb4f1;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+            color: #5a4630;
+            background-color: #f0f5f8; /* A warm, off-white color resembling paper */
+            box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="number"]:focus,
+        input[type="password"]:focus {
+            border-color: #b2967d;
+            outline: none;
+            background-color: #fff; /* Slightly brighter focus background */
+        }
+        .btn {
+            width: 100%;
+            padding: 12px 0;
+            font-size: 18px;
+            border-radius: 6px;
+            border: 2px solid #7eb4f1;
+            background-color: #7eb4f1;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            text-align: center;
+            font-family: 'Montserrat', sans-serif;
+}
+        .btn:hover {
+            background-color: #5a4630;
+            border-color: #5a4630;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Edit Student Details</h1>
+        <form action="{{ url_for('edit_student', student_id=student.id) }}" method="POST">
+            <div class="form-group">
+                <label for="rollno">Roll Number</label>
+                <input type="number" id="rollno" name="rollno" class="form-control" value="{{ student.rollno }}" required>
+            </div>
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" class="form-control" value="{{ student.name }}" required>
+            </div>
+            <div class="form-group">
+                <label for="semester">Semester</label>
+                <input type="text" id="semester" name="semester" class="form-control" value="{{ student.semester }}">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" class="form-control" value="{{ student.email }}" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-control" value="{{ student.password }}" required>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn">Update</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

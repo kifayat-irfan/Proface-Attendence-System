@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Proface Attendance System</title>
+  <style>
+    /* Custom style for sidebar link animation */
+    .sidebar-link {
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sidebar-link:hover {
+  transform: scale(0.95);
+  background-color: #d1d5db;
+}
+    .sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 250px;
+  overflow-y: auto;
+  background-color: #7eb4f1;
+  border-right: 1px solid rgba(25, 37, 31, 0.2); /* Light border with opacity */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  transition: transform 0.3s ease;
+  transform: translateX(-100%);
+  z-index: 20; /* Ensure sidebar is above the main content */
+}
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 30; /* Ensure hamburger icon is above the sidebar */
+    }
+
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    .hamburger.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body class="dark">
+   <!-- Hamburger Icon -->
+   <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+  <div class="flex h-screen">
+    
+    <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <br>
+    <br>
+    <div class="header">
+      <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
+    </div>
+    <br>
+    <hr>
+      <br>
+      <nav>
+        
+        <ul id="sidebarLinks">
+          <li class="mb-4">
+            <a href="/home"  class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
+            Home
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
+              Dashboard
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤" class="mr-2" />
+              Register Student
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
+              View Attendance
+            </a>
+          </li>
+          
+          
+          
+          
+          <li class="mb-4">
+            <a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="typography-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📝" class="mr-2" />
+              Mark Attendance
+            </a>
+          </li>
+          {% if session.is_admin %}
+          <li class="mb-4">
+            <a href="/faculty_registration" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🧑‍🏫" class="mr-2" />
+              Register Faculty
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="{{ url_for('approve_requests') }}" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=✓" class="mr-2" />
+              Approve requests
+            </a>
+          </li>
+          {% endif %}
+          
+          <li class="mb-4">
+            <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
+              Visit Site
+            </a>
+          </li>
+          
+        </ul>
+      </nav>
+      <hr>
+      <footer>
+        <p class="text-zinc-600 dark:text-zinc-400">
+          © 2024 Proface Attendance System. All rights reserved.
+        </p>
+      </footer>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+      <!-- Header -->
+      <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 dark p-4">
+        <h1 class="text-xl font-bold"> </h1>
+        <div class="flex items-center space-x-4">
+          <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
+          <button class="relative">
+            🔔
+             <span class="absolute top-0 right-0 inline-block "></span>
+          </button>
+          <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
+          <div class="nav-item">
+            <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Section -->
+      <main class="flex-1 p-6 bg-zinc-100 white:bg-zinc-900">
+<style>
+  /* Styles for the container and card */
+  .container {
+    width: 60%;
+    padding: 20px;
+    box-sizing: border-box;
+    margin: 0 auto; /* This will center the container */
+}
+
+  .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      width: 70%; /* Adjust the percentage to make it smaller or larger */
+    
+    margin-right: auto;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    
+    
+}
+  
+  .card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+  .card-header {
+      background: #7eb4f1;
+      color: #fff;
+      padding: 15px;
+      text-align: center;
+      font-size: 1.5em;
+      font-weight: bold;
+  }
+
+  .card-body {
+      padding: 20px;
+  }
+
+  .card-footer {
+      background: #f8f9fa;
+      padding: 10px;
+      text-align: center;
+  }
+
+  /* Styling for the form */
+  .form-group {
+      margin-bottom: 15px;
+  }
+
+  .form-control {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ced4da;
+      border-radius: 5px;
+      box-sizing: border-box;
+  }
+
+  .btn-primary {
+      display: inline-block;
+      padding: 10px 20px;
+      color: #fff;
+      background-color: #7eb4f1;
+      border: 1px solid #7eb4f1;
+      border-radius: 5px;
+      text-decoration: none;
+      font-size: 16px;
+      text-align: center;
+      cursor: pointer;
+  }
+
+  .btn-primary:hover {
+      background-color: #0056b3;
+      border-color: #004085;
+  }
+
+  /* Styling for error messages */
+  .text-danger {
+      color: #dc3545;
+      font-weight: bold;
+  }
+  .container-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 20px auto;
+  width: 100%;
+  max-width: 1200px; /* Adjust max-width as necessary */
+}
+/* Updated CSS for info-card */
+.info-card {
+  background-color: #f0f4f8;
+  border-left: 5px solid #7eb4f1;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, transform 0.5s ease, width 0.5s ease;
+  width: 25%
+}
+
+
+    .info-card:hover {
+      background-color: #e7f1ff;
+    }
+
+    .info-card h2 {
+      color: #7eb4f1;
+      font-size: 1.25em;
+      margin-bottom: 10px;
+    }
+
+    .info-card p {
+      color: #555;
+      font-size: 1em;
+      line-height: 1.6;
+    }
+  </style>
+
+<body>
+  
+<div class="container">
+  <div class="card">
+      <div class="card-header">
+          <h4 class="text-center">Mark Attendance</h4>
+      </div>
+      <div class="card-body">
+          {% if std_reg %}
+          <h5>Please enter the following information:</h5>
+          <br>
+          <form method="POST">
+              <div class="form-group">
+                  <label for="inputLecture">Lecture No.</label>
+                  <input type="number" class="form-control" name='lecture' id="inputLecture" placeholder="Enter lecture number" required>
+              </div>
+              <button type="submit" class="btn-primary">Next</button>
+          </form>
+          {% else %}
+          <h5 class="text-danger">No students are registered. You should register at least one student before marking attendance.</h5>
+          {% endif %}
+      </div>
+      <div class="card-footer text-muted">
+      </div>
+  </div>
+</div>
+
+</main>
+<script>
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('open');
+  }
+  function searchFunction() {
+              const input = document.getElementById('searchInput');
+              const filter = input.value.toLowerCase();
+              const ul = document.getElementById('sidebarLinks');
+              const li = ul.getElementsByTagName('li');
+        
+              for (let i = 0; i < li.length; i++) {
+                const a = li[i].getElementsByTagName('a')[0];
+                if (a.innerHTML.toLowerCase().indexOf(filter) > -1) {
+                  li[i].style.display = '';
+                } else {
+                  li[i].style.display = 'none';
+                }
+              }
+            }
+</script>
+</body>
+</html>

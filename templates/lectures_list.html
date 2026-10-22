@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Proface Attendance System</title>
+  <style>
+    /* Custom style for sidebar link animation */
+    .sidebar-link {
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+    .sidebar-link:hover {
+      transform: scale(0.95);
+      background-color: #d1d5db;
+    }
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 250px;
+      overflow-y: auto;
+      background-color: #7eb4f1;
+      border-right: 1px solid rgba(25, 37, 31, 0.2);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      transition: transform 0.3s ease;
+      transform: translateX(-100%);
+      z-index: 20;
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 30;
+    }
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+    .hamburger.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body class="dark">
+   <!-- Hamburger Icon -->
+   <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+  <div class="flex h-screen">
+   <!-- Sidebar -->
+   <div id="sidebar" class="sidebar">
+    <br><br>
+    <div class="header">
+      <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
+    </div>
+    <br>
+    <hr>
+      <br>
+    <nav>
+      <ul id="sidebarLinks">
+        <li class="mb-4">
+          <a href="/home" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+            <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
+            Home
+          </a>
+        </li>
+        <li class="mb-4">
+          <a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+            <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
+            Dashboard
+          </a>
+        </li>
+        <li class="mb-4">
+          <a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+            <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤" class="mr-2" />
+            Register Student
+          </a>
+        </li>
+        <li class="mb-4">
+          <a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+            <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
+            View Attendance
+          </a>
+        </li>
+        <li class="mb-4">
+          <a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+            <img aria-hidden="true" alt="typography-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📝" class="mr-2" />
+            Mark Attendance
+          </a>
+        </li>
+        {% if session.is_admin %}
+        <li class="mb-4">
+          <a href="/faculty_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+            <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🧑‍🏫" class="mr-2" />
+            Register Faculty
+          </a>
+        </li>
+        <li class="mb-4">
+          <a href="{{ url_for('approve_requests') }}" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+            <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=✓" class="mr-2" />
+            Approve requests
+          </a>
+        </li>
+        {% endif %}
+        <li class="mb-4">
+          <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+            <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
+            Visit Site
+          </a>
+        </li>
+        <li class="mb-4">
+          <a href="/documentation" class="sidebar-link flex items-center text-zinc-700 bg-blue-200 dark:text-zinc-700 p-2 rounded-md">
+            ℹ️ About us
+          </a>
+        </li>
+      </ul>
+    </nav>
+    <hr>
+    <footer>
+      <p class="text-zinc-600 dark:text-zinc-400">
+        © 2024 Proface Attendance System. All rights reserved.
+      </p>
+    </footer>
+  </div>
+
+     
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+      <!-- Header -->
+      <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 dark p-4">
+        <h1 class="text-xl font-bold"> </h1>
+        <div class="flex items-center space-x-4">
+          <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
+          <button class="relative">
+            🔔
+            <span class="absolute top-0 right-0 inline-block "></span>
+          </button>
+          <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
+          <div class="nav-item">
+            <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Section -->
+      <main class="flex-1 p-6 bg-zinc-100 white:bg-zinc-900">
+        <style>
+          /* Style for the container */
+          .container {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: calc(100% - 40px); /* Initial width minus padding */
+      margin-left: 40px; /* Initial margin to center the container */
+    }
+
+    /* Style for the container when sidebar is open */
+    .container.sidebar-open {
+      width: calc(100% - 300px); /* Reduced width to accommodate sidebar */
+      margin-left: 290px; /* Adjusted margin */
+    }
+          /* Style for the table header */
+          h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold; 
+          }
+          /* Style for the table */
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+          /* Style for table headers */
+          th {
+            background-color: #8dc1fc;
+            color: white;
+            padding: 10px;
+            text-align: left;
+          }
+          /* Style for table cells */
+          td {
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+          }
+          /* Alternate row colors */
+          tr:nth-child(even) {
+            background-color: #f2f2f2;
+          }
+          /* Hover effect for table rows */
+          tr:hover {
+            background-color: #e9ecef;
+          }
+          /* Align text in table cells */
+          td, th {
+            text-align: left;
+          }
+        </style>
+        <div class="container">
+          <div id="LectureListContainer" class="container">
+          <h1>💻 Lectures List</h1>
+          <table>
+            <tr>
+              <th>Course</th>
+              
+              <th>Date</th>
+              <th>Time</th>
+            </tr>
+            {% for lecture in lectures %}
+            <tr>
+              <td>{{ lecture.course }}</td>
+              
+              <td>{{ lecture.date }}</td>
+              <td>{{ lecture.time }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </main>
+      <script>
+        function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const studentListContainer = document.getElementById('LectureListContainer');
+      sidebar.classList.toggle('open');
+      studentListContainer.classList.toggle('sidebar-open');
+    }
+
+        function searchFunction() {
+          const input = document.getElementById('searchInput');
+          const filter = input.value.toLowerCase();
+          const ul = document.getElementById('sidebarLinks');
+          const li = ul.getElementsByTagName('li');
+
+          for (let i = 0; i < li.length; i++) {
+            const a = li[i].getElementsByTagName('a')[0];
+            if (a.innerHTML.toLowerCase().indexOf(filter) > -1) {
+              li[i].style.display = '';
+            } else {
+              li[i].style.display = 'none';
+            }
+          }
+        }
+      </script>
+    </body>
+</html>

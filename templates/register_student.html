@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Proface Attendance System</title>
+  <style>
+    /* Custom style for sidebar link animation */
+    .sidebar-link {
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sidebar-link:hover {
+      transform: translateY(-3px);
+      background-color: #d1d5db; /* Tailwind color for hover */
+    }
+    .sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 250px;
+  overflow-y: auto;
+  background-color: #7eb4f1;
+  border-right: 1px solid rgba(25, 37, 31, 0.2); /* Light border with opacity */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  transition: transform 0.3s ease;
+  transform: translateX(-100%);
+  z-index: 20; /* Ensure sidebar is above the main content */
+}
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 30; /* Ensure hamburger icon is above the sidebar */
+    }
+
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    .hamburger.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body class="dark">
+   <!-- Hamburger Icon -->
+   <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+  <div class="flex h-screen">
+    
+    <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <br>
+    <br>
+    <div class="header">
+      <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
+    </div>
+    <br>
+    <hr>
+      <br>
+      <nav>
+        
+        <ul id="sidebarLinks">
+          <li class="mb-4">
+            <a href="/home"  class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
+            Home
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
+              Dashboard
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤" class="mr-2" />
+              Register Student
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
+              View Attendance
+            </a>
+          </li>
+          
+          
+          
+          
+          <li class="mb-4">
+            <a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="typography-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📝" class="mr-2" />
+              Mark Attendance
+            </a>
+          </li>
+          {% if session.is_admin %}
+          <li class="mb-4">
+            <a href="/faculty_registration" class="sidebar-link flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🧑‍🏫" class="mr-2" />
+              Register Faculty
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="{{ url_for('approve_requests') }}" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=✓" class="mr-2" />
+              Approve requests
+            </a>
+          </li>
+          {% endif %}
+          
+          <li class="mb-4">
+            <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
+              Visit Site
+            </a>
+          </li>
+          
+        </ul>
+      </nav>
+      <hr>
+      <footer>
+        <p class="text-zinc-600 dark:text-zinc-400">
+          © 2024 Proface Attendance System. All rights reserved.
+        </p>
+      </footer>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+      <!-- Header -->
+      <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 dark p-4">
+        <h1 class="text-xl font-bold"> </h1>
+        <div class="flex items-center space-x-4">
+          <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
+          <button class="relative">
+            🔔
+             <span class="absolute top-0 right-0 inline-block "></span>
+          </button>
+          <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
+          <div class="nav-item">
+            <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Section -->
+      <main class="flex-1 p-6 bg-zinc-100 white:bg-zinc-900">
+<style>
+.container {
+    margin: 0 auto;
+    padding: 20px;
+    max-width: 800px;
+}
+
+/* Card styles */
+.card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    background-color: #fff;
+}
+
+.card-header {
+    background-color: #7eb4f1;
+    color: #fff;
+    padding: 15px;
+}
+
+.card-header h4 {
+    margin: 0;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+.card-footer {
+    background-color: #f8f9fa;
+    padding: 10px;
+    text-align: center;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+.image-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.image-container img {
+  max-height: 100%;
+  max-width: 100%;
+  height: auto;
+  width: auto;
+}
+
+.text-muted {
+    color: #6c757d;
+}
+.button-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 10vh; /* or whatever height you need */
+    width: 100%;
+    text-align: center;
+}
+
+.btn-warning:hover {
+    background-color: red;
+    color: white;
+}
+
+
+.btn-warning {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: rgb(0, 0, 0);
+  color: white;
+  font-size: 32px;
+  text-decoration: none;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.btn-warning:hover {
+  background-color: rgb(181, 21, 21);
+}
+
+.btn-warning:hover .fa-camera {
+  color: rgb(8, 8, 8);
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border: none;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+</style>
+
+
+<div class="container">
+  <div class="card">
+      <div class="card-header">
+          <h4 class="text-center">Register a Student</h4>
+      </div>
+      <div class="card-body">
+          <div class="text-center">
+              {% if not session.img_captured %}
+                  <p class="text-muted">
+                      Instructions:<br>
+                      1. Click on the button below to open the camera.<br>
+                      2. Press <strong>'C'</strong> to capture the Image.
+                  </p>
+              {% endif %}
+              <div class="image-container">
+              {% if temp_pic and session.img_captured %}
+                  <img src="{{ url_for('static', filename='images/users/temp.jpg') }}?xxx={{session.dt}}" height="300" width="300" alt="Student Image">
+              {% else %}
+                  <img src="{{ url_for('static', filename='images/no-image.png') }}?xxx={{ session.dt }}" height="300" width="300" alt="No Image">
+              {% endif %}
+            </div>
+              <p class="text-muted">Student Image</p><br>
+              {% if not session.img_captured %}
+              <div class="button-container">
+                <a href="/capture_image" class="btn btn-warning btn-lg" style="display: flex; justify-content: center; align-items: center; width: 60px; height: 60px; border-radius: 50%; background-color: rgb(216, 16, 16); color: white; font-size: 32px; text-decoration: none; transition: background-color 0.3s, color 0.3s;">
+                    <i class="fas fa-camera" style="transition: color 0.3s;"></i>
+                </a>
+            </div>
+            
+            
+            
+              {% endif %}
+          </div>
+          <br><br>
+          {% if session.img_captured %}
+              <form method="POST">
+                  <div class="form-group">
+                      <label for="inputName">Name</label>
+                      <input type="text" name='name' class="form-control" placeholder="Enter student name" id="inputName" required>
+                  </div>
+                  <div class="form-group">
+                      <label for="inputRoll">Enrollment No.</label>
+                      <input type="number" name='rollno' class="form-control" placeholder="Enter student roll no" id="inputRoll" required>
+                  </div>
+                  <div class="form-group">
+                      <label for="inputSem">Semester</label>
+                      <input type="text" name="semester" class="form-control" placeholder="Enter student semester" id="inputSem" required>
+                  </div>
+                  <div class="form-group">
+                      <label for="inputEmail4">Email</label>
+                      <input type="email" name="email" class="form-control" id="inputEmail4" placeholder="Email" required>
+                  </div>
+                  <div class="form-group">
+                      <label for="inputPassword4">Password</label>
+                      <input type="password" name="password" class="form-control" id="inputPassword4" placeholder="Password" required>
+                  </div>
+
+                  <button type="submit" class="btn btn-primary">Register Student</button>
+              </form>
+          {% endif %}
+      </div>
+      <div class="card-footer">
+      </div>
+  </div>
+</div>
+</div>
+<script>
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('open');
+  }
+  function searchFunction() {
+              const input = document.getElementById('searchInput');
+              const filter = input.value.toLowerCase();
+              const ul = document.getElementById('sidebarLinks');
+              const li = ul.getElementsByTagName('li');
+        
+              for (let i = 0; i < li.length; i++) {
+                const a = li[i].getElementsByTagName('a')[0];
+                if (a.innerHTML.toLowerCase().indexOf(filter) > -1) {
+                  li[i].style.display = '';
+                } else {
+                  li[i].style.display = 'none';
+                }
+              }
+            }
+</script>
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Proface Attendance System</title>
+  <style>
+    /* Custom style for sidebar link animation */
+    .sidebar-link {
+      transition: transform 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sidebar-link:hover {
+      transform: translateY(-3px);
+      background-color: #d1d5db; /* Tailwind color for hover */
+    }
+    .sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 250px;
+  overflow-y: auto;
+  background-color: #7eb4f1;
+  border-right: 1px solid rgba(25, 37, 31, 0.2); /* Light border with opacity */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  transition: transform 0.3s ease;
+  transform: translateX(-100%);
+  z-index: 20; /* Ensure sidebar is above the main content */
+}
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 30; /* Ensure hamburger icon is above the sidebar */
+    }
+
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+
+    .hamburger.hidden {
+      display: none;
+    }
+    
+  </style>
+</head>
+<body class="dark">
+   <!-- Hamburger Icon -->
+   <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+  <div class="flex h-screen">
+    
+    <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <br>
+    <br>
+    <div class="header">
+      <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
+    </div>
+    <br>
+    <hr>
+      <br>
+      
+      <nav>
+        
+        <ul id="sidebarLinks">
+          <li class="mb-4">
+            <a href="/home" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
+              Home
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
+              Dashboard
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤" class="mr-2" />
+              Register Student
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
+              View Attendance
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="typography-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📝" class="mr-2" />
+              Mark Attendance
+            </a>
+          </li>
+          {% if session.is_admin %}
+          <li class="mb-4">
+            <a href="/faculty_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🧑‍🏫" class="mr-2" />
+              Register Faculty
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="{{ url_for('approve_requests') }}" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
+              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=✓" class="mr-2" />
+              Approve requests
+            </a>
+          </li>
+          {% endif %}
+          <li class="mb-4">
+            <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
+              <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
+              Visit Site
+            </a>
+          </li>
+          <li class="mb-4">
+            <a href="/documentation" class="sidebar-link flex items-center text-zinc-700 bg-blue-200 dark:text-zinc-700 p-2 rounded-md">
+              ℹ️ About us
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <hr>
+      <footer>
+        <p class="text-zinc-600 dark:text-zinc-400">
+          © 2024 Proface Attendance System. All rights reserved.
+        </p>
+      </footer>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+     <!-- Header -->
+     <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 dark p-4">
+      <h1 class="text-xl font-bold"> </h1>
+      <div class="flex items-center space-x-4">
+        <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
+        <button class="relative">
+          🔔
+           <span class="absolute top-0 right-0 inline-block "></span>
+        </button>
+        <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
+        <div class="nav-item">
+          <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
+        </div>
+      </div>
+    </header>
+
+      <!-- Main Section -->
+      <main class="flex-1 p-6 bg-zinc-100 white:bg-zinc-900">
+        <div class="bg-zinc-200 dark:bg-blue-300 dark p-8 rounded-md text-center">
+          <h2 class="text-2xl font-bold text-zinc-800 dark:text-zinc-800 dark">Edit Attendance</h2>
+        </div>
+
+        <style>
+          /* Style for the cards */
+          /* Sidebar heading */
+    .sidebar-heading {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+        
+
+        .container {
+            background-color: rgba(255, 255, 255, 0.9); /* Slightly transparent white */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px; /* Set a max-width for better layout control */
+            margin: 0 auto; /* Center horizontally */
+      
+            overflow-y: auto;
+            transform: translateY(-20px);
+            animation: slideIn 0.5s ease-out;
+        }
+
+       
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        input[type="time"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+            color: #333;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="date"]:focus,
+        input[type="time"]:focus {
+            outline: none;
+            border-color: #7eb4f1;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .save-btn,
+        .cancel-btn {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .save-btn {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background-color: #218838;
+            transform: translateY(-2px);
+        }
+
+        .cancel-btn {
+            background-color: #dc3545;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .cancel-btn:hover {
+            background-color: #c82333;
+            transform: translateY(-2px);
+        }
+
+        /* Keyframe Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Table Styling */
+        table {
+            width: 100%;
+            
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            font-size: 16px;
+        }
+
+        th {
+            background-color: #7eb4f1;
+            color: white;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<br>
+<br>
+<body>
+    <div class="container">
+        
+        <form action="{{ url_for('edit_attendance', att_id=attendance.att_id) }}" method="POST">
+            <label for="course">Course:</label>
+            <input type="text" id="course" name="course" value="{{ attendance.course }}" required>
+
+            <label for="lecture_no">Lecture Number:</label>
+            <input type="number" id="lecture_no" name="lecture_no" value="{{ attendance.lecture_no }}" required>
+
+            <label for="marked_by">Marked By:</label>
+            <input type="text" id="marked_by" name="marked_by" value="{{ attendance.marked_by }}" required>
+
+            <label for="marked_date">Date:</label>
+            <input type="date" id="marked_date" name="marked_date" value="{{ attendance.marked_date }}" required>
+
+            <label for="marked_time">Time:</label>
+            <input type="time" id="marked_time" name="marked_time" value="{{ attendance.marked_time }}" step="1" required>
+
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" value="{{ attendance.name }}" required>
+
+            <label for="rollno">Roll No:</label>
+            <input type="number" id="rollno" name="rollno" value="{{ attendance.rollno }}" required>
+
+            <label for="location">Location:</label>
+            <input type="text" id="location" name="location" value="{{ attendance.location }}" required>
+
+            <div class="form-actions">
+                <button type="submit" class="save-btn">Save Changes</button>
+                <a href="{{ url_for('view_lectures_attendance') }}" class="cancel-btn">Cancel</a>
+            </div>
+        </form>
+    </div>
+    <script>
+        function toggleSidebar() {
+          document.getElementById('sidebar').classList.toggle('open');
+        }
+    
+        function searchFunction() {
+          const input = document.getElementById('searchInput');
+          const filter = input.value.toLowerCase();
+          const ul = document.getElementById('sidebarLinks');
+          const li = ul.getElementsByTagName('li');
+    
+          for (let i = 0; i < li.length; i++) {
+            const a = li[i].getElementsByTagName('a')[0];
+            if (a.innerHTML.toLowerCase().indexOf(filter) > -1) {
+              li[i].style.display = '';
+            } else {
+              li[i].style.display = 'none';
+            }
+          }
+        }
+    </script>
+</body>
+</html>

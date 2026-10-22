@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <title>Proface Attendance System</title>
+  <style>
+    /* Custom styles */
+    .card {
+      background-color: #ffffff;
+      border: 1px solid #e0e7ff; /* Light blue border */
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-body {
+      padding: 2rem;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem 0.5rem; /* Adjust padding for a narrow button */
+      border-radius: 0.375rem;
+      font-weight: 500;
+      text-align: left;
+      text-decoration: none;
+      width: 100%; /* Full width */
+      margin: 0.75rem 0; /* Adjust margin for spacing */
+      transition: background-color 0.3s ease;
+      color: #dadaed;
+    }
+
+    .btn-primary {
+      background-color: rgba(5, 1, 16, 0.6); /* Blue background */
+    }
+
+    .btn-primary:hover {
+      background-color: #838588; 
+      transform: scale(1.05); /* Slightly enlarge button on hover */
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* Add shadow on hover */
+    }
+
+    .btn-secondary {
+      background-color: rgba(5, 1, 16, 0.6); /* Light gray background */
+    }
+
+    .btn-secondary:hover {
+      background-color: #838588; 
+      transform: scale(1.05); /* Slightly enlarge button on hover */
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* Add shadow on hover */
+    }
+
+    .btn i {
+      margin-right: 0.5rem; /* Space between icon and text */
+    }
+
+    body {
+      background-image: url('static/image.gif'); /* Replace with your image path */
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    .sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 250px;
+  background-color: rgba(5, 1, 16, 0.6); /* Lower opacity (0.6) */
+  border-right: 1px solid rgba(25, 37, 31, 0.2); /* Light border with opacity */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  transition: transform 0.3s ease;
+  transform: translateX(-100%);
+}
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    .hamburger {
+      position: fixed;
+      left: 20px;
+      top: 20px;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .hamburger div {
+      width: 30px;
+      height: 3px;
+      background-color: #fbfbfe;
+      margin: 6px 0;
+      transition: 0.4s;
+    }
+  </style>
+</head>
+<body class="bg-blue-50 min-h-screen">
+
+  <!-- Hamburger Icon -->
+  <div class="hamburger" onclick="toggleSidebar()">
+    <div></div>
+    <div></div>
+    <div></div>
+  </div>
+
+  <!-- Sidebar -->
+  <div id="sidebar" class="sidebar">
+    <br>
+    <br>
+    <div class="header">
+      <h1 class="text-3xl font-bold text-white">🎓Proface Attendance System</h1>
+    </div>
+    <div class="card-body">
+      <a href="{{ url_for('login_student') }}" class="btn btn-primary">
+        <i class="fas fa-user"></i> Login as Student
+      </a>
+      <a href="{{ url_for('login_faculty') }}" class="btn btn-primary">
+        <i class="fas fa-chalkboard-teacher"></i> Login as Faculty
+      </a>
+      <a href="{{ url_for('signup_student') }}" class="btn btn-secondary">
+        <i class="fas fa-user-plus"></i> Signup as Student
+      </a>
+      <a href="{{ url_for('signup_faculty') }}" class="btn btn-secondary">
+        <i class="fas fa-chalkboard-teacher"></i> Signup as Faculty
+      </a>
+    </div>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('open');
+    }
+  </script>
+
+</body>
+</html>
