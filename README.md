@@ -52,17 +52,20 @@ A complete, production-style **facial recognition attendance system** built with
 - **Dashboards & reports** — per-course attendance views, lecture lists, student/faculty management
 - **CSV export** — download attendance per lecture (faculty) or per course (student)
 - **Full CRUD** — edit/delete students and attendance records
+- **📈 Analytics dashboard** (`/analytics`) — KPI cards, 14-day attendance trend chart, per-lecture breakdown, automatic **defaulter list** (< 75%) with one-click **parent email alerts**
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Web | Flask, Jinja2, Bootstrap 4, JavaScript |
+| Web | Flask, Jinja2, Bootstrap 4 / Tailwind, Chart.js, JavaScript |
 | Database | SQLite + SQLAlchemy + Flask-Migrate (Alembic) |
 | Face recognition | dlib (HOG + 68 landmarks + ResNet-29), `face_recognition` |
 | Emotion | Keras CNN (`emotion_model.h5`) |
 | Liveness | Eye-aspect-ratio blink detection (OpenCV) + anti-spoofing CNN (`liveness_model.h5`) |
 | Location | geopy + ipinfo.io geolocation |
+| Alerts | SMTP email to parents (env-configured, no credentials in code) |
+| Deploy | Docker + docker-compose, gunicorn |
 
 ## Project Structure
 
@@ -126,6 +129,26 @@ python app.py
 ```
 
 Open `http://127.0.0.1:5000`. The SQLite database is created automatically on first run.
+
+### 5b. One-command Docker run (alternative)
+
+```bash
+docker compose up --build
+```
+
+Then open `http://localhost:5000`. The DB and registered face photos persist in `./instance` and `./static/images/users`. Set `SECRET_KEY` (and `SMTP_*` for parent alerts) in the environment or a `.env` file.
+
+> First build takes a while — dlib compiles from source. Live camera marking needs a webcam + display on the host (see `docker-compose.yml` notes); dashboards, analytics, CSVs and the API work headless.
+
+### 6. Parent absence alerts (optional)
+
+1. Add each student's **parent email** on the Register/Edit Student page.
+2. Set SMTP via environment (Gmail: use an App Password, never your real password):
+   ```bash
+   export SMTP_HOST=smtp.gmail.com SMTP_PORT=587
+   export SMTP_USER=you@gmail.com SMTP_PASSWORD=your-app-password
+   ```
+3. Open **Analytics → 📧 Alert parents** — one click emails every defaulter's parent.
 
 ### 5. First admin
 

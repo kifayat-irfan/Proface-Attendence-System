@@ -1,0 +1,24 @@
+# One-command run:  docker compose up --build
+# Then open http://localhost:5000
+#
+# NOTE: live camera marking (/fr_attendance) needs a webcam + display on the
+# host. For camera passthrough on Linux, add:
+#   devices: ["/dev/video0:/dev/video0"]
+# and run with a display. All dashboards, analytics, CSVs and the API work
+# headless with zero extra config.
+services:
+  proface:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    volumes:
+      # Persist the SQLite DB and registered face photos across restarts
+      - ./instance:/app/instance
+      - ./static/images/users:/app/static/images/users
+    restart: unless-stopped

@@ -1,0 +1,9 @@
+.git
+__pycache__/
+*.pyc
+instance/
+*.db
+.venv*/
+venv/
+.pytest_cache/
+static/images/users/temp.jpg
