@@ -309,10 +309,24 @@
                   <img src="{{ url_for('static', filename='images/no-image.png') }}?xxx={{ session.dt }}" height="300" width="300" alt="No Image">
               {% endif %}
             </div>
-              <p class="text-muted">Student Image</p><br>
+              <p class="text-muted">Student Image</p>
+              {% if session.quality %}
+              <div class="alert {{ 'alert-success' if not session.quality.issues else 'alert-danger' }} p-2">
+                Quality: <strong>{{ session.quality.score }}/100</strong>
+                {% if session.quality.issues %} — retake recommended{% endif %}
+              </div>
+              {% endif %}<br>
               {% if not session.img_captured %}
+              <div class="mb-3">
+                <p class="text-muted mb-2"><strong>Capture angle:</strong> take up to 5 photos (front required, others improve accuracy)</p>
+                <div class="btn-group" role="group">
+                  {% for a, label in [('front','🧍 Front'),('left','↩️ Left'),('right','↪️ Right'),('up','⬆️ Up'),('glasses','👓 Glasses')] %}
+                  <a href="/capture_image?angle={{ a }}" class="btn {{ 'btn-primary' if session.get('capture_angle', 'front') == a else 'btn-outline-primary' }}">{{ label }}</a>
+                  {% endfor %}
+                </div>
+              </div>
               <div class="button-container">
-                <a href="/capture_image" class="btn btn-warning btn-lg" style="display: flex; justify-content: center; align-items: center; width: 60px; height: 60px; border-radius: 50%; background-color: rgb(216, 16, 16); color: white; font-size: 32px; text-decoration: none; transition: background-color 0.3s, color 0.3s;">
+                <a href="/capture_image?angle={{ session.get('capture_angle', 'front') }}" class="btn btn-warning btn-lg" style="display: flex; justify-content: center; align-items: center; width: 60px; height: 60px; border-radius: 50%; background-color: rgb(216, 16, 16); color: white; font-size: 32px; text-decoration: none; transition: background-color 0.3s, color 0.3s;">
                     <i class="fas fa-camera" style="transition: color 0.3s;"></i>
                 </a>
             </div>

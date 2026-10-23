@@ -142,6 +142,26 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(45))
 
 
+class FaceTemplate(db.Model):
+    """Multiple face embeddings per student (Phase 6: multi-angle enrollment).
+
+    Each row is one verified enrollment photo (front/left/right/up/glasses).
+    The recognizer matches against ALL templates — a student is recognized
+    if ANY of their angle templates matches.
+    """
+    __tablename__ = 'FaceTemplate'
+    __table_args__ = {'extend_existing': True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    rollno = db.Column(db.Integer, nullable=False, index=True)
+    angle_label = db.Column(db.String(20), default='front')  # front/left/right/up/glasses
+    embedding = db.Column(db.LargeBinary, nullable=False)
+    dim = db.Column(db.Integer, nullable=False)  # 128 (dlib) / 512 (arcface)
+    engine = db.Column(db.String(20), nullable=False)
+    quality_score = db.Column(db.Integer)  # 0-100 from quality.py
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 
     with app.app_context():
         
@@ -414,16 +434,21 @@ def register_student():
             db.session.add(new_student)
             db.session.commit()
 
+            # Phase 6: multi-angle enrollment — photo saved as {rollno}__{angle}.jpg
+            angle = session.pop('quality_angle', 'front')
+            quality = session.pop('quality', {})
+            photo_name = f'{request.form["rollno"]}__{angle}.jpg'
             if os.path.isfile('static/images/users/temp.jpg'):
                 os.rename('static/images/users/temp.jpg',
-                          f'static/images/users/{request.form["rollno"]}.jpg')
+                          f'static/images/users/{photo_name}')
             if 'img_captured' in session:
                 session.pop('img_captured')
             # Make the new student recognizable immediately (no restart);
-            # embedding is cached in the DB for fast future startups
-            new_photo = os.path.join(known_faces_dir, f'{request.form["rollno"]}.jpg')
+            # template saved in DB with its quality score
+            new_photo = os.path.join(known_faces_dir, photo_name)
             if os.path.isfile(new_photo):
-                add_known_face(new_photo, new_student)
+                add_known_face(new_photo, new_student, angle_label=angle,
+                               quality_score=quality.get('score'))
             flash('Student registration successful', 'success')
             return render_template('register_student.html')
         else:
@@ -584,6 +609,11 @@ def documentation():
 @is_faculty_logged_in
 def capture_image():
     session['dt'] = datetime.now()
+    # Phase 6: which angle is being captured (front/left/right/up/glasses)
+    angle = request.args.get('angle', 'front')
+    if angle not in ('front', 'left', 'right', 'up', 'glasses'):
+        angle = 'front'
+    session['capture_angle'] = angle
     path = 'static/images/users'
     cap = cv2.VideoCapture(0)
 
@@ -602,7 +632,22 @@ def capture_image():
     cap.release()
     cv2.destroyAllWindows()
 
-    session['img_captured'] = True
+    # Phase 6: quality gate — reject bad enrollment photos immediately
+    temp_path = os.path.join(path, 'temp.jpg')
+    img = cv2.imread(temp_path)
+    if img is not None:
+        result = assess_photo(img, recognition_engine)
+        session['quality'] = {'score': result['score'], 'issues': result['issues']}
+        if result['passed']:
+            session['img_captured'] = True
+            session['quality_angle'] = session.get('capture_angle', 'front')
+            flash(f"Photo accepted (quality {result['score']}/100) ✅", 'success')
+        else:
+            session.pop('img_captured', None)
+            flash(f"Photo rejected: {issue_text(result['issues'])}", 'danger')
+    else:
+        session.pop('img_captured', None)
+        flash('Capture failed — try again.', 'danger')
 
     return redirect(url_for('register_student'))
 
@@ -994,45 +1039,110 @@ def _encode_photo(image_path):
     return hits[0][1] if hits else None
 
 
-def add_known_face(image_path, student=None):
-    """Add one photo to the registry (and cache its embedding in the DB).
+def save_template(rollno, embedding, angle_label='front', quality_score=None):
+    """Persist one face template (multi-angle enrollment, Phase 6)."""
+    try:
+        FaceTemplate.query.filter_by(
+            rollno=rollno, angle_label=angle_label,
+            engine=recognition_engine.name).delete()
+        db.session.add(FaceTemplate(
+            rollno=rollno, angle_label=angle_label,
+            embedding=_emb_to_bytes(embedding),
+            dim=recognition_engine.dim, engine=recognition_engine.name,
+            quality_score=quality_score))
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
 
+
+def add_known_face(image_path, student=None, angle_label='front', quality_score=None):
+    """Add one photo to the registry (and save its template in the DB).
+
+    Supports multi-angle filenames: {rollno}__{angle}.jpg
     Called at startup for every photo and right after a new student
     registers — no server restart needed.
     """
-    rollno = os.path.splitext(os.path.basename(image_path))[0]
+    basename = os.path.splitext(os.path.basename(image_path))[0]
+    if '__' in basename:
+        rollno, angle_label = basename.rsplit('__', 1)
+    else:
+        rollno = basename
+    try:
+        rollno_int = int(rollno)
+    except ValueError:
+        return False
+
     emb = None
-    # 1. Try the DB cache first (instant)
-    if student is not None and student.face_embedding             and student.embedding_engine == recognition_engine.name \
+    # 1. FaceTemplate rows first (instant, multi-angle)
+    tpl = FaceTemplate.query.filter_by(
+        rollno=rollno_int, angle_label=angle_label,
+        engine=recognition_engine.name,
+        dim=recognition_engine.dim).first() if student is not None else None
+    if tpl:
+        emb = _emb_from_bytes(tpl.embedding, tpl.dim)
+    # 2. Legacy single-embedding cache on Student (migrate it)
+    if emb is None and student is not None and student.face_embedding \
+            and student.embedding_engine == recognition_engine.name \
             and student.embedding_dim == recognition_engine.dim:
         emb = _emb_from_bytes(student.face_embedding, student.embedding_dim)
-    else:
-        # 2. Compute and cache
+        save_template(rollno_int, emb, angle_label, quality_score)
+    # 3. Compute from photo and save
+    if emb is None:
         emb = _encode_photo(image_path)
-        if emb is not None and student is not None:
-            try:
-                student.face_embedding = _emb_to_bytes(emb)
-                student.embedding_dim = recognition_engine.dim
-                student.embedding_engine = recognition_engine.name
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
+        if emb is not None:
+            save_template(rollno_int, emb, angle_label, quality_score)
     if emb is not None:
-        face_registry[:] = [(r, e) for r, e in face_registry if str(r) != str(rollno)]
-        face_registry.append((rollno, emb))
+        # Refresh ALL of this student's templates from the DB (keeps every
+        # angle; replaces the re-saved one). Matcher tries all of them.
+        face_registry[:] = [(r, e) for r, e in face_registry
+                            if str(r) != str(rollno_int)]
+        try:
+            for tpl in FaceTemplate.query.filter_by(
+                    rollno=rollno_int, engine=recognition_engine.name,
+                    dim=recognition_engine.dim).all():
+                face_registry.append(
+                    (rollno_int, _emb_from_bytes(tpl.embedding, tpl.dim)))
+        except Exception:
+            face_registry.append((rollno_int, emb))
         return True
     return False
 
 
 def load_known_faces():
-    """(Re)load every registered student into the face registry."""
+    """(Re)load every registered student into the face registry.
+
+    Multi-angle: each student may have several templates (front/left/right
+    ...); the matcher tries all of them.
+    """
     face_registry.clear()
+    # 1. Fast path: all templates for the active engine from the DB
+    try:
+        rows = FaceTemplate.query.filter_by(
+            engine=recognition_engine.name,
+            dim=recognition_engine.dim).all()
+        for tpl in rows:
+            face_registry.append(
+                (tpl.rollno, _emb_from_bytes(tpl.embedding, tpl.dim)))
+        if face_registry:
+            print(f"Face registry: {len(face_registry)} templates "
+                  f"({recognition_engine.name}, from DB)")
+            return
+    except Exception as e:
+        print(f"FaceTemplate load failed ({e}); falling back to photos")
+    # 2. Slow path: encode from photos (also seeds the DB)
     if not os.path.isdir(known_faces_dir):
         return
     for filename in os.listdir(known_faces_dir):
-        if filename.lower().endswith((".jpg", ".jpeg", ".png")) and filename != "temp.jpg":
-            rollno = os.path.splitext(filename)[0]
-            student = Student.query.filter_by(rollno=rollno).first()
+        if filename.lower().endswith((".jpg", ".jpeg", ".png")) \
+                and filename != "temp.jpg":
+            basename = os.path.splitext(filename)[0]
+            rollno = basename.rsplit('__', 1)[0] if '__' in basename else basename
+            try:
+                student = Student.query.filter_by(rollno=int(rollno)).first()
+            except ValueError:
+                student = None
             add_known_face(os.path.join(known_faces_dir, filename), student)
 
 
