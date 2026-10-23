@@ -105,15 +105,14 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. Download the landmark model
+### 2. Models — all included! ✅
 
-The 68-point shape predictor (~95MB) is too large for the repo — fetch it once:
+All AI models ship in the repo (verified authentic):
+- `shape_predictor_68_face_landmarks.dat` (95MB) — 68-point facial landmarks
+- `dlib_face_recognition_resnet_model_v1.dat` (22MB) — 128-d face embeddings
+- `emotion_model.h5` / `liveness_model.h5` — trained CNNs
 
-```bash
-python download_models.py
-```
-
-(The 128-d ResNet recognition model ships in the repo; Haar cascades ship with OpenCV and are included for convenience.)
+(`download_models.py` remains as a fallback to re-fetch the shape predictor from dlib.net if ever needed.)
 
 ### 3. Configure (optional)
 
