@@ -1,3 +1,13 @@
+---
+title: ProFace — AI Attendance System
+emoji: 🎯
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # ProFace — AI-Powered Facial Recognition Attendance System
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
