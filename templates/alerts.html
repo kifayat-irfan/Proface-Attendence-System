@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Smart Alerts{% endblock %}
+{% block page_title %}🔔 Smart Alerts {% if unread %}<span class="text-sm bg-red-500 text-white px-2 py-1 rounded-full">{{ unread }} new</span>{% endif %}{% endblock %}
+
+{% block nav %}
+<a href="/faculty" class="pf-link">📊 Dashboard</a>
+<a href="/live" class="pf-link">🎥 Live Marking</a>
+<a href="/analytics" class="pf-link">📈 Analytics</a>
+<a href="/alerts" class="pf-link active">🔔 Alerts</a>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+{% for a in alerts %}
+  <div class="pf-card flex items-start gap-4 {{ 'opacity-75' if a.is_read }}">
+    <div class="text-3xl">{{ '🚨' if a.alert_type=='absence_streak' else '⚠️' if a.alert_type=='low_attendance' else '👤' }}</div>
+    <div class="flex-1">
+      <div class="font-bold text-slate-800">{{ a.title }}</div>
+      <div class="text-sm text-slate-500 mt-1">{{ a.details }}</div>
+      <div class="text-xs text-slate-400 mt-2">{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at }}</div>
+    </div>
+    <a href="/alerts/dismiss/{{ a.id }}" class="text-sm text-slate-400 hover:text-red-600 underline">Dismiss</a>
+  </div>
+{% else %}
+  <div class="pf-card text-center py-12">
+    <div class="text-5xl mb-4">✅</div>
+    <div class="font-bold text-slate-700">All clear!</div>
+    <div class="text-sm text-slate-500 mt-1">No smart alerts right now. The system checks hourly.</div>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

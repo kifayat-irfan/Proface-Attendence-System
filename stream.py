@@ -7,6 +7,7 @@ Solution: ONE background thread owns the camera and runs detection,
 annotation and attendance marking. Viewers only read the latest JPEG.
 CPU stays flat no matter how many faculty watch.
 """
+import os
 import threading
 import time
 
@@ -87,6 +88,8 @@ class SharedStream:
 
         marked_rollnos = set()
         idle_since = None
+        src_path = hooks['get_camera_source']()
+        is_file = isinstance(src_path, str) and os.path.isfile(src_path)
         try:
             while True:
                 with self._lock:
@@ -101,6 +104,10 @@ class SharedStream:
 
                 ret, frame = cap.read()
                 if not ret:
+                    if is_file:
+                        # Demo mode: loop the video file
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
                     time.sleep(0.2)
                     continue
                 detections = hooks['recognize_faces'](frame)

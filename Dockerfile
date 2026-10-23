@@ -24,9 +24,10 @@ COPY . .
 RUN python download_models.py
 
 ENV SECRET_KEY=change-me-in-production \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PORT=7860
 
-EXPOSE 5000
+EXPOSE 7860
 
 # Apply migrations, then serve with gunicorn
-CMD ["sh", "-c", "flask --app app db upgrade 2>/dev/null || true; gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 4 'app:app'"]
+CMD ["sh", "-c", "flask --app app db upgrade 2>/dev/null || true; gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 4 --timeout 120 'app:app'"]
