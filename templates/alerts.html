@@ -13,7 +13,7 @@
 <div class="space-y-4">
 {% for a in alerts %}
   <div class="pf-card flex items-start gap-4 {{ 'opacity-75' if a.is_read }}">
-    <div class="text-3xl">{{ '🚨' if a.alert_type=='absence_streak' else '⚠️' if a.alert_type=='low_attendance' else '👤' }}</div>
+    <div class="text-3xl">{{ '🚨' if a.alert_type=='absence_streak' else '⚠️' if a.alert_type=='low_attendance' else '🔄' if a.alert_type=='reenroll' else '👤' }}</div>
     <div class="flex-1">
       <div class="font-bold text-slate-800">{{ a.title }}</div>
       <div class="text-sm text-slate-500 mt-1">{{ a.details }}</div>

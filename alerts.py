@@ -11,6 +11,9 @@ the same (type, rollno, day).
 from datetime import date, timedelta
 
 
+REENROLL_AFTER_DAYS = 365  # face templates older than this trigger a reminder
+
+
 def check_smart_alerts(db, Student, Attendance, Alert, FaceTemplate=None):
     """Scan for alert conditions. Returns number of NEW alerts created.
 
@@ -67,6 +70,29 @@ def check_smart_alerts(db, Student, Attendance, Alert, FaceTemplate=None):
                     details=(f'Roll no {s.rollno}: {total}/{all_days} lectures. '
                              f'At risk of falling below the requirement.'),
                     rollno=s.rollno))
+                created += 1
+
+    # 3. Face aging: templates older than a year need re-enrollment
+    if FaceTemplate is not None:
+        cutoff = today - timedelta(days=REENROLL_AFTER_DAYS)
+        # oldest template per student
+        seen = set()
+        for tpl in FaceTemplate.query.all():
+            if tpl.rollno in seen:
+                continue
+            seen.add(tpl.rollno)
+            if tpl.created_at and tpl.created_at.date() < cutoff \
+                    and not _exists('reenroll', tpl.rollno):
+                s = Student.query.filter_by(rollno=tpl.rollno).first()
+                name = s.name if s else f'Roll no {tpl.rollno}'
+                age_days = (today - tpl.created_at.date()).days
+                db.session.add(Alert(
+                    alert_type='reenroll',
+                    title=f'{name}: face photo is {age_days} days old',
+                    details=(f'Faces change over time. Re-enroll {name} '
+                             f'(roll no {tpl.rollno}) with fresh photos for '
+                             f'best accuracy.'),
+                    rollno=tpl.rollno))
                 created += 1
 
     if created:

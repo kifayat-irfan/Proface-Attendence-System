@@ -223,11 +223,22 @@ def require_api_key(f):
     return wrapper
 
 
+def get_tenant():
+    """Tenant slug for this deployment (multi-university).
+
+    Each university runs its own deployment (Docker + own database) with a
+    unique TENANT_SLUG. The slug tags backups, audit logs and API responses
+    so data is never mixed up between institutions.
+    """
+    return os.environ.get('TENANT_SLUG', 'default').strip().lower() or 'default'
+
+
 @app.context_processor
 def inject_branding():
-    """INSTITUTION_NAME env var brands every deployment (multi-university)."""
+    """INSTITUTION_NAME + TENANT_SLUG branding on every page."""
     return {'INSTITUTION_NAME': os.environ.get(
-        'INSTITUTION_NAME', 'ProFace Attendance System')}
+                'INSTITUTION_NAME', 'ProFace Attendance System'),
+            'TENANT_SLUG': get_tenant()}
 
 
 def log_audit(action, details="", role=None):
@@ -242,7 +253,7 @@ def log_audit(action, details="", role=None):
             actor_email=str(email),
             actor_role=role,
             action=action,
-            details=details,
+            details=f"[tenant:{get_tenant()}] {details}" if details else f"[tenant:{get_tenant()}]",
             ip_address=request.remote_addr,
         ))
         db.session.commit()
@@ -534,7 +545,7 @@ def _maybe_check_alerts():
     if time.time() - _last_alert_check > 3600:
         _last_alert_check = time.time()
         try:
-            n = check_smart_alerts(db, Student, Attendance, Alert)
+            n = check_smart_alerts(db, Student, Attendance, Alert, FaceTemplate)
             if n:
                 print(f"Smart alerts: {n} new")
         except Exception as e:
@@ -922,6 +933,8 @@ def api_keys():
 @app.route('/api/v1/health')
 def api_health():
     return {"status": "ok", "version": "2.0",
+            "tenant": get_tenant(),
+            "institution": os.environ.get('INSTITUTION_NAME', 'ProFace'),
             "engine": recognition_engine.name,
             "stream_running": shared_stream.stats["running"]}
 
@@ -1037,7 +1050,7 @@ def dismiss_alert(alert_id):
 @app.route('/api/v1/alerts/check', methods=['POST'])
 @require_api_key
 def api_alerts_check():
-    n = check_smart_alerts(db, Student, Attendance, Alert)
+    n = check_smart_alerts(db, Student, Attendance, Alert, FaceTemplate)
     log_audit('alerts_checked', f'{n} new alerts', role='system')
     return {"new_alerts": n}
 
@@ -1067,7 +1080,10 @@ def admin_backup():
         flash('Admins only.', 'danger')
         return redirect(url_for('faculty'))
     import io, json
-    data = {"exported_at": datetime.utcnow().isoformat(), "tables": {}}
+    data = {"exported_at": datetime.utcnow().isoformat(),
+            "tenant": get_tenant(),
+            "institution": os.environ.get('INSTITUTION_NAME', 'ProFace'),
+            "tables": {}}
     for model, name in [(Student, 'students'), (Attendance, 'attendance'),
                         (Faculty, 'faculty'), (AuditLog, 'audit_log'),
                         (Alert, 'alerts')]:
@@ -1086,7 +1102,7 @@ def admin_backup():
     log_audit('backup_exported', f"{sum(len(v) for v in data['tables'].values())} rows",
               role='admin')
     return send_file(buf, mimetype='application/json', as_attachment=True,
-                     download_name=f"proface-backup-{date.today().isoformat()}.json")
+                     download_name=f"proface-backup-{get_tenant()}-{date.today().isoformat()}.json")
 
 
 @app.route("/logout")

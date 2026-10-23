@@ -1,0 +1,71 @@
+# ProFace — multi-university deployment (Phase 8)
+#
+# Each university gets its OWN container + OWN database (deployment-per-tenant).
+# Data can never leak between institutions; scale each independently.
+#
+# Usage:
+#   1. Copy to docker-compose.yml (or: docker compose -f docker-compose.multi.yml up --build)
+#   2. Set a real SECRET_KEY per university below
+#   3. docker compose up --build -d
+#
+# University A -> http://localhost:8001   (tenant: kkkuk)
+# University B -> http://localhost:8002   (tenant: uop)
+
+services:
+  proface-kkkuk:
+    build: .
+    container_name: proface-kkkuk
+    ports:
+      - "8001:7860"
+    environment:
+      PORT: 7860
+      SECRET_KEY: change-me-kkkuk-use-a-real-secret
+      TENANT_SLUG: kkkuk
+      INSTITUTION_NAME: Khushal Khan Khattak University Karak
+      DATABASE_URL: postgresql://proface:proface@db-kkkuk:5432/proface
+      CAMERA_SOURCE: 0
+    depends_on:
+      - db-kkkuk
+    restart: unless-stopped
+
+  db-kkkuk:
+    image: postgres:16-alpine
+    container_name: proface-db-kkkuk
+    environment:
+      POSTGRES_USER: proface
+      POSTGRES_PASSWORD: proface
+      POSTGRES_DB: proface
+    volumes:
+      - pgdata-kkkuk:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  proface-uop:
+    build: .
+    container_name: proface-uop
+    ports:
+      - "8002:7860"
+    environment:
+      PORT: 7860
+      SECRET_KEY: change-me-uop-use-a-real-secret
+      TENANT_SLUG: uop
+      INSTITUTION_NAME: University of Peshawar
+      DATABASE_URL: postgresql://proface:proface@db-uop:5432/proface
+      CAMERA_SOURCE: 0
+    depends_on:
+      - db-uop
+    restart: unless-stopped
+
+  db-uop:
+    image: postgres:16-alpine
+    container_name: proface-db-uop
+    environment:
+      POSTGRES_USER: proface
+      POSTGRES_PASSWORD: proface
+      POSTGRES_DB: proface
+    volumes:
+      - pgdata-uop:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata-kkkuk:
+  pgdata-uop:
