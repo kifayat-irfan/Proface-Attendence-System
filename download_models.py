@@ -14,7 +14,7 @@ import urllib.request
 
 MODEL_URL = "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
 MODEL_FILE = "shape_predictor_68_face_landmarks.dat"
-EXPECTED_SIZE = 99_557_280  # ~95MB uncompressed
+EXPECTED_SIZE = 99_693_937  # ~95MB uncompressed
 
 
 def _progress(blocks, block_size, total):
