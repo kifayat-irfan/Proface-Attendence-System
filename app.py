@@ -1464,6 +1464,14 @@ def get_camera_source():
     return int(src) if src.isdigit() else src
 
 
+def _safe_session_get(key, default=None):
+    """session.get that survives background threads (no request context)."""
+    try:
+        return session.get(key, default)
+    except RuntimeError:
+        return default
+
+
 def _mark_one_attendance(rollno, location_str, ctx=None):
     """Mark attendance for one roll number. Returns True if newly marked.
 
@@ -1473,9 +1481,9 @@ def _mark_one_attendance(rollno, location_str, ctx=None):
     student = Student.query.filter_by(rollno=rollno).first()
     student_name = student.name if student else 'Unknown Student'
     ctx = ctx or {}
-    lecture_number = ctx.get('lecture_no') or session.get('lecture_no', 'Unknown Lecture')
-    course = ctx.get('course') or session.get('course', 'Unknown')
-    marked_by = ctx.get('marked_by') or session.get('name', 'Unknown')
+    lecture_number = ctx.get('lecture_no') or _safe_session_get('lecture_no', 'Unknown Lecture')
+    course = ctx.get('course') or _safe_session_get('course', 'Unknown')
+    marked_by = ctx.get('marked_by') or _safe_session_get('name', 'Unknown')
     exists = Attendance.query.filter_by(
         rollno=rollno, lecture_no=lecture_number,
         marked_date=datetime.now().date()).first()
@@ -1501,12 +1509,18 @@ def _shared_mark(rollno, location_str, ctx):
         return _mark_one_attendance(rollno, location_str, ctx)
 
 
+def _shared_annotate(frame, detections, location_str):
+    """Annotation inside the stream thread (needs app context for Student names)."""
+    with app.app_context():
+        return detect_faces_and_annotate(frame, detections, location_str)
+
+
 # Bind app functions into the shared stream (once, at startup)
 shared_stream.bind(
     get_camera_source=get_camera_source,
     get_user_location=get_user_location,
     recognize_faces=recognize_faces,
-    detect_faces_and_annotate=detect_faces_and_annotate,
+    detect_faces_and_annotate=_shared_annotate,
     mark_attendance=_shared_mark,
 )
 
