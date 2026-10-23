@@ -19,6 +19,7 @@ from geopy.distance import geodesic
 import face_recognition
 
 from security import hash_password, verify_password, is_hashed, is_live_face, LIVENESS_THRESHOLD
+from recognition import DlibEngine, get_engine
 from analytics import course_kpis, attendance_trend, defaulter_list, lecture_breakdown
 from notify import send_absence_alert, smtp_configured
 
@@ -44,9 +45,6 @@ LIVENESS_INPUT_SIZE = (64, 64)
 LIVENESS_REAL_INDEX = 1
 # LIVENESS_THRESHOLD + is_live_face() live in security.py (unit-tested).
 
-# Face-detection speed: run the HOG detector on a downscaled frame
-# (~4x faster at 0.5); rectangles are mapped back to full-frame coordinates.
-FACE_DETECT_SCALE = 0.5
 
 
 # Emotion labels
@@ -67,10 +65,14 @@ limiter = Limiter(
     default_limits=["500 per hour"],
     storage_uri="memory://",
 )
-# Database configuration
+# Database configuration: DATABASE_URL env for PostgreSQL, else local SQLite.
+# Example: DATABASE_URL=postgresql://user:pass@localhost:5432/proface
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'site.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'DATABASE_URL',
+    'sqlite:///' + os.path.join(basedir, 'instance', 'site.db'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 
 
 db = SQLAlchemy(app)
@@ -88,6 +90,9 @@ class Student(db.Model):
     email = db.Column(db.String(100), unique=True)
     password = db.Column(db.String(255))  # hashed (scrypt); widened from 80
     parent_email = db.Column(db.String(120))  # for absence alerts to parents
+    face_embedding = db.Column(db.LargeBinary)  # cached face embedding (float32 bytes)
+    embedding_dim = db.Column(db.Integer)  # 128 (dlib) or 512 (arcface)
+    embedding_engine = db.Column(db.String(20))  # engine that produced the embedding
     pic_path = db.Column(db.Text)
     registered_on = db.Column(db.DateTime)
     approved = db.Column(db.Boolean, default=False)  # New column
@@ -124,10 +129,43 @@ class Attendance(db.Model):
     location = db.Column(db.String(80))  # New column
 
 
+class AuditLog(db.Model):
+    __tablename__ = 'AuditLog'
+    __table_args__ = {'extend_existing': True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    actor_email = db.Column(db.String(120))
+    actor_role = db.Column(db.String(20))  # student / faculty / admin / system
+    action = db.Column(db.String(80), nullable=False)
+    details = db.Column(db.Text)
+    ip_address = db.Column(db.String(45))
+
+
 
     with app.app_context():
         
         db.create_all()
+def log_audit(action, details="", role=None):
+    """Write an audit trail entry. Never raises - auditing must not break app flow."""
+    try:
+        email = session.get('uname') or session.get('roll_no') or 'anonymous'
+        if role is None:
+            role = 'admin' if session.get('is_admin') else (
+                'faculty' if session.get('fty_logged_in') else (
+                    'student' if session.get('std_logged_in') else 'anonymous'))
+        db.session.add(AuditLog(
+            actor_email=str(email),
+            actor_role=role,
+            action=action,
+            details=details,
+            ip_address=request.remote_addr,
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -162,6 +200,7 @@ def login_student():
                 session['roll_no'] = student.rollno
 
                 flash('You are now logged in', 'success')
+                log_audit('login', f'student {email} logged in')
                 return redirect(url_for('student'))
         else:
             flash('Invalid email or password.', 'danger')
@@ -192,6 +231,7 @@ def login_faculty():
                 session['name'] = faculty.name
                 session['is_admin'] = True
                 flash('Admin login successful', 'success')
+                log_audit('login', f'admin {email} logged in', role='admin')
                 return redirect(url_for('faculty'))  # Redirect to faculty dashboard
             
             # Non-admin faculty handling
@@ -205,6 +245,7 @@ def login_faculty():
             session['name'] = faculty.name
             session['course'] = faculty.course
             flash('You are now logged in', 'success')
+            log_audit('login', f'faculty {email} logged in')
             return redirect(url_for('faculty'))  # Redirect to faculty dashboard
 
         else:
@@ -378,10 +419,11 @@ def register_student():
                           f'static/images/users/{request.form["rollno"]}.jpg')
             if 'img_captured' in session:
                 session.pop('img_captured')
-            # Make the new student recognizable immediately (no restart)
+            # Make the new student recognizable immediately (no restart);
+            # embedding is cached in the DB for fast future startups
             new_photo = os.path.join(known_faces_dir, f'{request.form["rollno"]}.jpg')
             if os.path.isfile(new_photo):
-                add_known_face(new_photo)
+                add_known_face(new_photo, new_student)
             flash('Student registration successful', 'success')
             return render_template('register_student.html')
         else:
@@ -474,8 +516,10 @@ def lectures_list():
 @is_faculty_logged_in
 def delete_student(student_id):
     student = Student.query.get_or_404(student_id)
+    rollno = student.rollno
     db.session.delete(student)
     db.session.commit()
+    log_audit('student_deleted', f'rollno {rollno}')
     flash('Student deleted successfully', 'success')
     return redirect(url_for('students_list'))
 @app.route('/edit_student/<int:student_id>', methods=['GET', 'POST'])
@@ -492,6 +536,7 @@ def edit_student(student_id):
             student.password = hash_password(new_pw)
         student.parent_email = request.form.get('parent_email') or None
         db.session.commit()
+        log_audit('student_edited', f'rollno {student.rollno}')
         flash('Student details updated successfully', 'success')
         return redirect(url_for('students_list'))
     return render_template('edit_student.html', student=student)
@@ -512,6 +557,7 @@ def edit_attendance(att_id):
         attendance.location = request.form['location']
         
         db.session.commit()
+        log_audit('attendance_edited', f'att_id {att_id}')
         flash('Attendance record updated successfully', 'success')
         return redirect(url_for('view_lectures_attendance'))
 
@@ -521,8 +567,10 @@ def edit_attendance(att_id):
 @is_faculty_logged_in
 def delete_attendance(att_id):
     attendance = Attendance.query.get_or_404(att_id)
+    att_id = attendance.att_id
     db.session.delete(attendance)
     db.session.commit()
+    log_audit('attendance_deleted', f'att_id {att_id}')
     flash('Attendance record deleted successfully', 'success')
     return redirect(url_for('view_lectures_attendance'))
 
@@ -695,6 +743,25 @@ def alert_absentees():
     return redirect(url_for('analytics_dashboard', course=course))
 
 
+@app.route('/audit_log')
+@is_faculty_logged_in
+def audit_log():
+    if not session.get('is_admin'):
+        flash('Admins only.', 'danger')
+        return redirect(url_for('faculty'))
+    page = request.args.get('page', 1, type=int)
+    logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).paginate(
+        page=page, per_page=50, error_out=False)
+    return render_template('audit_log.html', logs=logs)
+
+
+@app.route('/liveness_check')
+@is_faculty_logged_in
+def liveness_check():
+    """Real-world verification guide for the anti-spoofing CNN."""
+    return render_template('liveness_check.html')
+
+
 @app.route("/logout")
 def logout():
     if 'std_logged_in' or 'fty_logged_in' in session:
@@ -703,24 +770,6 @@ def logout():
 
 # Emotion detection function
 # --- Vision pipeline: one shared detector, one detection pass per frame ---
-_face_detector = dlib.get_frontal_face_detector()
-
-
-def detect_faces(image, scale=1.0):
-    """Detect faces with dlib HOG. With scale < 1, detection runs on a
-    downscaled copy for speed and rectangles are mapped back to full-frame
-    coordinates."""
-    if scale != 1.0:
-        h, w = image.shape[:2]
-        small = cv2.resize(image, (max(1, int(w * scale)), max(1, int(h * scale))))
-        faces = _face_detector(small, 1)
-        inv = 1.0 / scale
-        return [dlib.rectangle(int(f.left() * inv), int(f.top() * inv),
-                               int(f.right() * inv), int(f.bottom() * inv))
-                for f in faces]
-    return _face_detector(image, 1)
-
-
 def detect_emotion(face_crop_bgr):
     """Emotion label for one BGR face crop (never the whole frame)."""
     gray = cv2.cvtColor(face_crop_bgr, cv2.COLOR_BGR2GRAY)
@@ -738,37 +787,17 @@ def cnn_liveness_score(face_crop_bgr):
     return float(probs[LIVENESS_REAL_INDEX])
 
 
-def get_face_encodings(image, shape_predictor, face_recognition_model):
-    faces = detect_faces(image)
-    encodings = []
-    for face in faces:
-        shape = shape_predictor(image, face)
-        encoding = np.array(face_recognition_model.compute_face_descriptor(image, shape))
-        encodings.append(encoding)
-    return encodings
-
-
-def match_encoding(face_encoding):
-    """Best-match roll number for one 128-d encoding, or None."""
-    if not known_face_encodings:
-        return None
-    distances = np.linalg.norm(np.array(known_face_encodings) - face_encoding, axis=1)
-    if np.any(distances <= 0.6):
-        return known_face_rollnos[int(np.argmin(distances))]
-    return None
-
-
 def recognize_faces(frame):
-    """Single detection pass per frame. Returns a list of dicts
-    {rollno|None, rect, encoding} shared by recognition AND annotation, so the
-    on-screen overlay can never mismatch the recognized identities."""
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    faces = detect_faces(rgb_frame, scale=FACE_DETECT_SCALE)
+    """Single detection pass per frame via the active recognition engine.
+    Returns [{rollno|None, rect, encoding}] shared by recognition AND
+    annotation, so the overlay can never mismatch the identities."""
     results = []
-    for face in faces:
-        shape = shape_predictor(rgb_frame, face)
-        encoding = np.array(face_recognition_model.compute_face_descriptor(rgb_frame, shape))
-        results.append({"rollno": match_encoding(encoding), "rect": face, "encoding": encoding})
+    for (x1, y1, x2, y2), encoding in recognition_engine.detect_and_encode(frame):
+        results.append({
+            "rollno": recognition_engine.match(encoding, face_registry),
+            "rect": (x1, y1, x2, y2),
+            "encoding": encoding,
+        })
     return results
 
 KARAK_LOCATION = (32.193, 70.0633)
@@ -881,9 +910,8 @@ def detect_faces_and_annotate(frame, detections, location):
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     for det in detections:
-        face = det["rect"]
-        x1, y1 = max(0, face.left()), max(0, face.top())
-        x2, y2 = face.right(), face.bottom()
+        x1, y1, x2, y2 = det["rect"]
+        x1, y1 = max(0, x1), max(0, y1)
         crop = frame[y1:y2, x1:x2]
         rollno = det["rollno"] if det["rollno"] else "Unknown"
 
@@ -892,7 +920,7 @@ def detect_faces_and_annotate(frame, detections, location):
             cnn_score = cnn_liveness_score(crop)
         else:
             emotion, cnn_score = "Unknown", 0.0
-        shape = shape_predictor(rgb_frame, face)
+        shape = shape_predictor(rgb_frame, dlib.rectangle(x1, y1, x2, y2))
         blink_live = detect_liveness(shape)
         live = is_live_face(blink_live, cnn_score)
 
@@ -921,148 +949,228 @@ def detect_faces_and_annotate(frame, detections, location):
     cv2.putText(frame, f'Location: {location}', (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
     return frame
-# Load known faces and their encodings
-# --- Face template registry (dlib models loaded ONCE; absolute paths) ---
+# --- Face recognition engine (dlib default; RECOGNITION_ENGINE=arcface for ArcFace) ---
+# dlib models loaded ONCE; absolute paths.
 shape_predictor = dlib.shape_predictor(os.path.join(current_dir, "shape_predictor_68_face_landmarks.dat"))
 face_recognition_model = dlib.face_recognition_model_v1(
     os.path.join(current_dir, "dlib_face_recognition_resnet_model_v1.dat"))
 
-known_face_encodings = []
-known_face_rollnos = []
+_engine_choice = os.environ.get("RECOGNITION_ENGINE", "dlib").lower()
+if _engine_choice == "arcface":
+    try:
+        recognition_engine = get_engine()  # builds ArcFaceEngine (downloads models once)
+        print("Recognition engine: ArcFace (512-d)")
+    except Exception as e:
+        print(f"ArcFace unavailable ({e}); falling back to dlib")
+        recognition_engine = DlibEngine(shape_predictor, face_recognition_model,
+                                        dlib.get_frontal_face_detector())
+else:
+    recognition_engine = DlibEngine(shape_predictor, face_recognition_model,
+                                    dlib.get_frontal_face_detector())
+    print("Recognition engine: dlib (128-d)")
+
+# --- Face template registry with DB embedding cache ---
+# face_registry: [(rollno, np.ndarray embedding)] for the ACTIVE engine.
+# Embeddings are cached in Student.face_embedding so restarts don't re-encode
+# hundreds of photos (the old code re-encoded every photo on every startup).
+face_registry = []
 known_faces_dir = os.path.join(current_dir, "static", "images", "users")
 
 
-def add_known_face(image_path):
-    """Encode one registered photo and add it to the in-memory registry.
+def _emb_to_bytes(emb):
+    return np.asarray(emb, dtype=np.float32).tobytes()
 
-    Returns True on success. Called at startup for every photo and again
-    right after a new student registers — no server restart needed.
+
+def _emb_from_bytes(data, dim):
+    return np.frombuffer(data, dtype=np.float32).reshape(dim)
+
+
+def _encode_photo(image_path):
+    """Encode one photo with the active engine. Returns embedding or None."""
+    img = cv2.imread(image_path)
+    if img is None:
+        return None
+    hits = recognition_engine.detect_and_encode(img)
+    return hits[0][1] if hits else None
+
+
+def add_known_face(image_path, student=None):
+    """Add one photo to the registry (and cache its embedding in the DB).
+
+    Called at startup for every photo and right after a new student
+    registers — no server restart needed.
     """
-    try:
-        image = dlib.load_rgb_image(image_path)
-    except Exception:
-        return False
-    encodings = get_face_encodings(image, shape_predictor, face_recognition_model)
-    if encodings:
-        known_face_encodings.append(encodings[0])
-        rollno = os.path.splitext(os.path.basename(image_path))[0]
-        if rollno not in known_face_rollnos:
-            known_face_rollnos.append(rollno)
+    rollno = os.path.splitext(os.path.basename(image_path))[0]
+    emb = None
+    # 1. Try the DB cache first (instant)
+    if student is not None and student.face_embedding             and student.embedding_engine == recognition_engine.name \
+            and student.embedding_dim == recognition_engine.dim:
+        emb = _emb_from_bytes(student.face_embedding, student.embedding_dim)
+    else:
+        # 2. Compute and cache
+        emb = _encode_photo(image_path)
+        if emb is not None and student is not None:
+            try:
+                student.face_embedding = _emb_to_bytes(emb)
+                student.embedding_dim = recognition_engine.dim
+                student.embedding_engine = recognition_engine.name
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+    if emb is not None:
+        face_registry[:] = [(r, e) for r, e in face_registry if str(r) != str(rollno)]
+        face_registry.append((rollno, emb))
         return True
     return False
 
 
 def load_known_faces():
-    """(Re)load every registered student photo into the face registry."""
-    known_face_encodings.clear()
-    known_face_rollnos.clear()
+    """(Re)load every registered student into the face registry."""
+    face_registry.clear()
     if not os.path.isdir(known_faces_dir):
         return
     for filename in os.listdir(known_faces_dir):
         if filename.lower().endswith((".jpg", ".jpeg", ".png")) and filename != "temp.jpg":
-            add_known_face(os.path.join(known_faces_dir, filename))
+            rollno = os.path.splitext(filename)[0]
+            student = Student.query.filter_by(rollno=rollno).first()
+            add_known_face(os.path.join(known_faces_dir, filename), student)
 
 
-load_known_faces()
+with app.app_context():
+    load_known_faces()
+print(f"Face registry: {len(face_registry)} templates ({recognition_engine.name})")
 
 @app.route('/fr_attendance')
 @is_faculty_logged_in
 def mark_face_attendance():
-    # Open the camera
-    cap = None
-    for camera_index in range(10):
-        cap = cv2.VideoCapture(camera_index)
-        if cap.isOpened():
-            print(f"Using camera index {camera_index}")
-            break
+    """Live face-attendance page (browser MJPEG stream). The old blocking
+    cv2.imshow loop is gone — video now streams to the browser."""
+    return redirect(url_for('live_marking'))
+
+
+# ================= Live streaming (Phase 5) =================
+# Camera source: CAMERA_SOURCE env — "0" for webcam, or an RTSP/HTTP URL
+# for IP cameras. Examples: "0", "rtsp://user:pass@192.168.1.10/stream"
+def get_camera_source():
+    src = os.environ.get("CAMERA_SOURCE", "0").strip()
+    return int(src) if src.isdigit() else src
+
+
+live_stats = {"marked_this_session": 0, "faces_seen": 0, "running": False}
+
+
+def _mark_one_attendance(rollno, location_str):
+    """Mark attendance for one roll number. Returns True if newly marked."""
+    student = Student.query.filter_by(rollno=rollno).first()
+    student_name = student.name if student else 'Unknown Student'
+    lecture_number = session.get('lecture_no', 'Unknown Lecture')
+    course = session.get('course', 'Unknown')
+    marked_by = session.get('name', 'Unknown')
+    exists = Attendance.query.filter_by(
+        rollno=rollno, lecture_no=lecture_number,
+        marked_date=datetime.now().date()).first()
+    if exists:
+        return False
+    db.session.add(Attendance(
+        name=student_name, rollno=rollno, course=course,
+        lecture_no=lecture_number, marked_by=marked_by,
+        marked_date=datetime.now().date(), marked_time=datetime.now().time(),
+        location=location_str))
+    db.session.commit()
+    try:
+        log_audit("attendance_marked",
+                  f"{rollno} marked for lecture {lecture_number} ({course})")
+    except Exception:
+        pass
+    return True
+
+
+def gen_frames():
+    """MJPEG frame generator: recognize + liveness + mark + annotate."""
+    cap = cv2.VideoCapture(get_camera_source())
+    if not cap.isOpened():
+        # Yield a single error frame so the <img> tag shows something useful
+        err = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(err, "Camera unavailable - check CAMERA_SOURCE",
+                    (40, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        _, jpeg = cv2.imencode('.jpg', err)
+        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+               + jpeg.tobytes() + b'\r\n')
+        return
+
+    # Location once per session: GPS from browser (if shared) else IP lookup
+    gps = session.get('gps')
+    if gps:
+        location = (gps['lat'], gps['lon'])
+        location_str = f"{gps['lat']:.4f},{gps['lon']:.4f} (GPS)"
     else:
-        print("No valid camera found.")
-        return "No valid camera found", 400
+        location_data = get_user_location()
+        location = location_data.get('location', 'Unknown')
+        location_str = (f"{location[0]},{location[1]}"
+                        if location != 'Unknown' else 'Unknown')
 
-    if cap is None or not cap.isOpened():
-        return "Failed to open camera", 500
-
-    # Set to track marked roll numbers
     marked_rollnos = set()
-
-    # Location is (approximately) static for a marking session: fetch it ONCE,
-    # not on every frame (previously an HTTP request per frame).
-    location_data = get_user_location()
-    location = location_data.get('location', 'Unknown')
-    location_str = f"{location[0]},{location[1]}" if location != 'Unknown' else 'Unknown'
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Failed to capture image.")
-            break
-
-        # Single detection pass: recognition + rects shared with the overlay
-        detections = recognize_faces(frame)
-
-        # Annotate first (fills in emotion / CNN score / live flag per face)
-        processed_frame = detect_faces_and_annotate(frame, detections, location)
-
-        for det in detections:
-            rollno = det["rollno"]
-            if not rollno or rollno in marked_rollnos:
-                continue
-            if not det.get("live", False):
-                # Anti-spoofing gate: never mark a face the liveness checks reject
-                flash(f"Roll number {rollno}: liveness check failed - not marked.", 'warning')
-                marked_rollnos.add(rollno)  # don't nag every frame
-                continue
-            # Lookup student name based on roll number
-            student = Student.query.filter_by(rollno=rollno).first()
-            student_name = student.name if student else 'Unknown Student'
-
-            # Get the current lecture number and course from the session or database
-            lecture_number = session.get('lecture_no', 'Unknown Lecture')
-            course = session.get('course', 'Unknown')
-            marked_by = session.get('name', 'Unknown')
-
-            # Check if attendance already marked for this rollno, lecture_no, and marked_date
-            existing_attendance = Attendance.query.filter_by(
-                rollno=rollno,
-                lecture_no=lecture_number,
-                marked_date=datetime.now().date()
-            ).first()
-
-            if not existing_attendance:
-                # Mark attendance
-                attendance = Attendance(
-                    name=student_name,
-                    rollno=rollno,
-                    course=course,
-                    lecture_no=lecture_number,
-                    marked_by=marked_by,
-                    marked_date=datetime.now().date(),
-                    marked_time=datetime.now().time(),
-                    location=location_str
-                )
-                db.session.add(attendance)
-                db.session.commit()
-                flash(f"Attendance marked for roll number {rollno}", 'success')
-
-                # Add roll number to the set to prevent re-marking
+    live_stats["running"] = True
+    live_stats["marked_this_session"] = 0
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            detections = recognize_faces(frame)
+            live_stats["faces_seen"] = len(detections)
+            frame = detect_faces_and_annotate(frame, detections, location_str)
+            for det in detections:
+                rollno = det["rollno"]
+                if not rollno or rollno in marked_rollnos:
+                    continue
+                if not det.get("live", False):
+                    marked_rollnos.add(rollno)
+                    continue
+                if _mark_one_attendance(rollno, location_str):
+                    live_stats["marked_this_session"] += 1
                 marked_rollnos.add(rollno)
-            else:
-                flash(f"Roll number {rollno} has already been marked for this lecture.", 'info')
-                marked_rollnos.add(rollno)
+            _, jpeg = cv2.imencode('.jpg', frame)
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+                   + jpeg.tobytes() + b'\r\n')
+    finally:
+        live_stats["running"] = False
+        cap.release()
 
-        # Display the frame with annotations
-        if processed_frame is not None:
-            cv2.imshow('Facial Recognition with Liveness and Emotion Detection', processed_frame)
 
-        # Exit loop if 'q' is pressed
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+@app.route('/video_feed')
+@is_faculty_logged_in
+def video_feed():
+    return Response(gen_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
-    # Release resources
-    cap.release()
-    cv2.destroyAllWindows()
 
-    return redirect(url_for('mark_attendance_2'))
+@app.route('/live')
+@is_faculty_logged_in
+def live_marking():
+    return render_template('live_marking.html',
+                           camera_source=str(get_camera_source()))
+
+
+@app.route('/api/live_stats')
+@is_faculty_logged_in
+def api_live_stats():
+    return dict(live_stats)
+
+
+@app.route('/api/gps', methods=['POST'])
+@is_faculty_logged_in
+def api_gps():
+    """Browser GPS from the live page (Geolocation API) for accurate geofencing."""
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        lat, lon = float(data['lat']), float(data['lon'])
+    except (KeyError, TypeError, ValueError):
+        return {"ok": False}, 400
+    session['gps'] = {"lat": lat, "lon": lon}
+    return {"ok": True, "location": f"{lat:.4f},{lon:.4f}"}
+
+
 
 
 if __name__ == '__main__':

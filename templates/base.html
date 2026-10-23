@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/proface-logo.webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>{% block title %}ProFace{% endblock %} — ProFace Attendance System</title>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    body { background: #f1f5f9; }
+    .pf-sidebar {
+      background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
+      width: 260px; min-height: 100vh; position: fixed; left: 0; top: 0; z-index: 40;
+      transition: transform .3s ease; display: flex; flex-direction: column;
+    }
+    .pf-link {
+      display: flex; align-items: center; gap: .75rem; padding: .7rem 1rem;
+      border-radius: .65rem; color: #cbd5e1; font-weight: 500; font-size: .925rem;
+      transition: all .2s ease; margin-bottom: .25rem;
+    }
+    .pf-link:hover { background: rgba(255,255,255,.08); color: #fff; transform: translateX(3px); }
+    .pf-link.active { background: linear-gradient(90deg, #2563eb, #4f46e5); color: #fff;
+      box-shadow: 0 4px 14px rgba(37,99,235,.4); }
+    .pf-card {
+      background: #fff; border-radius: 1rem; padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(15,23,42,.06);
+      border: 1px solid #f1f5f9;
+    }
+    .pf-kpi-num { font-size: 2.25rem; font-weight: 800;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .pf-btn {
+      background: linear-gradient(90deg, #2563eb, #4f46e5); color: #fff;
+      padding: .65rem 1.5rem; border-radius: .65rem; font-weight: 600;
+      box-shadow: 0 4px 14px rgba(37,99,235,.35); transition: all .2s;
+      display: inline-block; text-align: center;
+    }
+    .pf-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37,99,235,.45); }
+    .pf-btn-red { background: linear-gradient(90deg, #dc2626, #ef4444);
+      box-shadow: 0 4px 14px rgba(220,38,38,.35); }
+    .pf-input {
+      width: 100%; padding: .7rem 1rem; border-radius: .65rem;
+      border: 1.5px solid #e2e8f0; transition: border .2s;
+    }
+    .pf-input:focus { border-color: #2563eb; outline: none;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .pf-topbar {
+      background: rgba(255,255,255,.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid #e2e8f0;
+    }
+    @media (max-width: 768px) {
+      .pf-sidebar { transform: translateX(-100%); }
+      .pf-sidebar.open { transform: translateX(0); }
+      .pf-main { margin-left: 0 !important; }
+    }
+    .pf-main { margin-left: 260px; min-height: 100vh; }
+    #hamburger { display: none; }
+    @media (max-width: 768px) { #hamburger { display: block; } }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <button id="hamburger" class="fixed top-4 left-4 z-50 bg-slate-900 text-white p-2 rounded-lg"
+          onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+
+  <aside id="sidebar" class="pf-sidebar p-5">
+    <div class="flex items-center gap-3 mb-8 px-1">
+      <img src="/static/proface-logo.webp" alt="ProFace" class="w-11 h-11 rounded-xl shadow-lg">
+      <div>
+        <div class="text-white font-800 font-extrabold text-lg leading-none">ProFace</div>
+        <div class="text-slate-400 text-xs mt-1">AI Attendance System</div>
+      </div>
+    </div>
+    <nav class="flex-1">
+      {% block nav %}{% endblock %}
+    </nav>
+    <div class="pt-4 border-t border-white/10">
+      <div class="text-slate-400 text-xs px-1">© 2026 ProFace<br>v2.0 · World Class 🌍</div>
+    </div>
+  </aside>
+
+  <div class="pf-main">
+    <header class="pf-topbar sticky top-0 z-30 px-6 py-4 flex items-center justify-between">
+      <h1 class="text-xl font-bold text-slate-800">{% block page_title %}{% endblock %}</h1>
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-slate-500">👤 {{ session.uname or session.get('roll_no', '') }}</span>
+        <a href="/logout" title="Logout"
+           class="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-red-100 text-lg">⎋</a>
+      </div>
+    </header>
+    <main class="p-6 max-w-7xl mx-auto">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="mb-4 p-4 rounded-xl text-sm font-medium
+            {{ 'bg-green-50 text-green-800 border border-green-200' if cat=='success'
+               else 'bg-amber-50 text-amber-800 border border-amber-200' if cat=='warning'
+               else 'bg-red-50 text-red-800 border border-red-200' }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,385 +1,56 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-  <title>Proface Attendance System</title>
-  <style>
-    /* Custom style for sidebar link animation */
-    .sidebar-link {
-      transition: transform 0.3s ease, background-color 0.3s ease;
-    }
+{% extends "base.html" %}
+{% block title %}Faculty Dashboard{% endblock %}
+{% block page_title %}Faculty Dashboard{% endblock %}
 
-    .sidebar-link:hover {
-      transform: translateY(-3px);
-      background-color: #d1d5db; /* Tailwind color for hover */
-    }
-    .sidebar {
-  position: fixed;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 250px;
-  overflow-y: auto;
-  background-color: #7eb4f1;
-  border-right: 1px solid rgba(25, 37, 31, 0.2); /* Light border with opacity */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  padding: 1rem;
-  transition: transform 0.3s ease;
-  transform: translateX(-100%);
-  z-index: 20; /* Ensure sidebar is above the main content */
-}
+{% block nav %}
+<a href="/faculty" class="pf-link active">📊 Dashboard</a>
+<a href="/live" class="pf-link">🎥 Live Marking</a>
+<a href="/analytics" class="pf-link">📈 Analytics</a>
+<a href="/view_lectures_attendance" class="pf-link">📋 View Attendance</a>
+<a href="/student_registration" class="pf-link">➕ Register Student</a>
+<a href="/faculty_registration" class="pf-link">👨‍🏫 Register Faculty</a>
+<a href="/liveness_check" class="pf-link">🛡️ Liveness Check</a>
+{% if session.is_admin %}
+<a href="/audit_log" class="pf-link">📜 Audit Log</a>
+<a href="{{ url_for('approve_requests') }}" class="pf-link">✅ Approvals</a>
+{% endif %}
+<a href="/documentation" class="pf-link">ℹ️ About</a>
+{% endblock %}
 
-    .sidebar.open {
-      transform: translateX(0);
-    }
-
-    .hamburger {
-      position: fixed;
-      left: 20px;
-      top: 20px;
-      cursor: pointer;
-      z-index: 30; /* Ensure hamburger icon is above the sidebar */
-    }
-
-    .hamburger div {
-      width: 30px;
-      height: 3px;
-      background-color: #fbfbfe;
-      margin: 6px 0;
-      transition: 0.4s;
-    }
-
-    .hamburger.hidden {
-      display: none;
-    }
-    
-  </style>
-</head>
-<body class="dark">
-   <!-- Hamburger Icon -->
-   <div class="hamburger" onclick="toggleSidebar()">
-    <div></div>
-    <div></div>
-    <div></div>
+{% block content %}
+<div class="rounded-2xl p-8 mb-8 text-white relative overflow-hidden"
+     style="background: linear-gradient(135deg, #1d4ed8 0%, #7c3aed 60%, #2563eb 100%);">
+  <div class="relative z-10">
+    <h2 class="text-3xl font-extrabold mb-2">Welcome back, {{ session.name or 'Faculty' }}! 👋</h2>
+    <p class="text-blue-100 text-sm max-w-xl">
+      Mark attendance with AI face recognition, track defaulters, and alert parents —
+      all from one world-class dashboard.
+    </p>
+    <a href="/live" class="inline-block mt-5 bg-white text-blue-700 font-bold px-6 py-3 rounded-xl
+       hover:-translate-y-0.5 transition shadow-lg">🎥 Start Live Marking →</a>
   </div>
-  <div class="flex h-screen">
-    
-    <!-- Sidebar -->
-  <div id="sidebar" class="sidebar">
-    <br>
-    <br>
-    <div class="header">
-      <h1 class="text-3xl font-bold text-white">Proface Attendance System</h1>
-    </div>
-    <br>
-    <hr>
-      <br>
-      
-      <nav>
-        
-        <ul id="sidebarLinks">
-          <li class="mb-4">
-            <a href="/home" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🏠" class="mr-2" />
-              Home
-            </a>
-          </li>
-          <li class="mb-4">
-            <a href="/faculty" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="dashboard-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📊" class="mr-2" />
-              Dashboard
-            </a>
-          </li>
-          <li class="mb-4">
-            <a href="/student_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤" class="mr-2" />
-              Register Student
-            </a>
-          </li>
-          <li class="mb-4">
-            <a href="/view_lectures_attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="table-list-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📋" class="mr-2" />
-              View Attendance
-            </a>
-          </li>
-          <li class="mb-4">
-            <a href="/analytics" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="analytics-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📈" class="mr-2" />
-              Analytics
-            </a>
-          </li>
-          <li class="mb-4">
-            <a href="/attendance" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="typography-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📝" class="mr-2" />
-              Mark Attendance
-            </a>
-          </li>
-          {% if session.is_admin %}
-          <li class="mb-4">
-            <a href="/faculty_registration" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=🧑‍🏫" class="mr-2" />
-              Register Faculty
-            </a>
-          </li>
-          <li class="mb-4">
-            <a href="{{ url_for('approve_requests') }}" class="sidebar-link flex items-center text-dark bg-blue-200 p-2 rounded-md">
-              <img aria-hidden="true" alt="user-profile-icon" src="https://openui.fly.dev/openui/24x24.svg?text=✓" class="mr-2" />
-              Approve requests
-            </a>
-          </li>
-          {% endif %}
-          <li class="mb-4">
-            <a href="https://www.bing.com/search?pglt=673&q=khushal+khan+khattak+university+karak&cvid=a55fe943c0684faea525a564853d075d&gs_lcrp=EgZjaHJvbWUqBggBEAAYQDIGCAAQRRg5MgYIARAAGEAyBggCEEUYOzIGCAMQRRg7MgYIBBAuGEAyBggFEC4YQDIGCAYQRRg8MgYIBxBFGDwyBggIEEUYPNIBCDE2MDJqMGoxqAIAsAIA&FORM=ANNTA1&PC=U531" class="flex items-center text-dark bg-blue-200 dark :text-zinc-300 hover:bg-zinc-300 white:hover:bg-zinc-800 p-2 rounded-md">
-              <img aria-hidden="true" alt="maps-icon" src="https://openui.fly.dev/openui/24x24.svg?text=📍" class="mr-2" />
-              Visit Site
-            </a>
-          </li>
-          <li class="mb-4">
-            <a href="/documentation" class="sidebar-link flex items-center text-zinc-700 bg-blue-200 dark:text-zinc-700 p-2 rounded-md">
-              ℹ️ About us
-            </a>
-          </li>
-        </ul>
-      </nav>
-      <hr>
-      <footer>
-        <p class="text-zinc-600 dark:text-zinc-400">
-          © 2024 Proface Attendance System. All rights reserved.
-        </p>
-      </footer>
-    </div>
+  <div class="absolute -right-10 -top-10 w-64 h-64 rounded-full opacity-20 bg-white blur-2xl"></div>
+  <div class="absolute right-24 bottom-0 w-40 h-40 rounded-full opacity-10 bg-white blur-xl"></div>
+</div>
 
-    <!-- Main Content -->
-    <div class="flex-1 flex flex-col">
-     <!-- Header -->
-     <header class="flex items-center justify-between bg-blue-300 dark:bg-blue-300 dark p-4">
-      <h1 class="text-xl font-bold"> </h1>
-      <div class="flex items-center space-x-4">
-        <input type="text" id="searchInput" onkeyup="searchFunction()" placeholder="Search..." class="p-2 rounded-md bg-zinc-100 text-zinc-700 mb-4">
-        <button class="relative">
-          🔔
-           <span class="absolute top-0 right-0 inline-block "></span>
-        </button>
-        <img aria-hidden="true" alt="user-icon" src="https://openui.fly.dev/openui/24x24.svg?text=👤"><a> {{ session.uname }}</a> 
-        <div class="nav-item">
-          <a class="nav-link" style="color:rgb(17, 17, 17); font-size: 24px;" href="/logout">⎋</a>
-        </div>
-      </div>
-    </header>
-
-      <!-- Main Section -->
-      <main class="flex-1 p-6 bg-zinc-100 white:bg-zinc-900">
-        <div class="bg-zinc-200 dark:bg-blue-300 dark p-8 rounded-md text-center">
-          <h2 class="text-2xl font-bold text-zinc-800 dark:text-zinc-800 dark">Welcome to Proface Attendance System</h2>
-        </div>
-
-        <style>
-          /* Style for the cards */
-          /* Sidebar heading */
-    .sidebar-heading {
-      font-size: 1.25rem;
-      font-weight: bold;
-      margin-bottom: 1rem;
-    }
-          
-          .card {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 0.25rem;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
-            
-          }
-          
-          .card:hover {
-            transform: translateY(-5px);
-          }
-          
-          /* Style for the card headers */
-          
-          
-          /* Style for the card bodies */
-          .card-body {
-            padding: 1.25rem;
-            text-align: center;
-          }
-          
-          /* Style for the card titles */
-          .card-title {
-            font-size: 1.25rem;
-            font-weight: 500;
-            margin-bottom: 0.75rem;
-          }
-          
-          /* Style for the card text */
-          .card-text {
-            font-size: 1rem;
-            color: #6c757d;
-          }
-          
-          /* Style for the icons */
-          .card-title i {
-            margin-left: 0.5rem;
-            color: #007bff;
-          }
-          
-          /* Style for the rows */
-          .row {
-            margin-top: 1rem;
-          }
-          
-          /* Style for the individual columns */
-          .col-sm-4 {
-            padding: 0.5rem;
-          }
-          </style>
-          
-          <div class="col-md-12">
-            <div class="card">
-              <div class="card-header">
-                <h4 class="card-title"></h4>
-              </div>
-              <div class="card-body">
-                <div class="row">
-                  {% if session.is_admin %}
-                  
-                  <div class="col-sm-4">
-                    <a href='faculty_list'>
-                    <div class="card">
-                      <div class="card-body">
-                        <h5 class="card-title">Staff <i class="fas fa-user"></i></h5>
-                        <p class="card-text">{{ faculty_count }}</p>
-                      </div>
-                    </div>
-                  </a>
-                  </div>
-                  {% endif %}
-          
-                  <div class="col-sm-4">
-                    <a href='students_list'>
-                    <div class="card">
-                      <div class="card-body">
-                        <h5 class="card-title">Students <i class="fa fa-graduation-cap" aria-hidden="true"></i></h5>
-                        <p class="card-text">{{ students_count }}</p>
-                      </div>
-                    </div>
-                    </a>
-                  </div>
-          
-                  <div class="col-sm-4">
-                    <a href='lectures_list'>
-                    <div class="card">
-                      <div class="card-body">
-                        <h5 class="card-title">Lectures <i class="fa fa-book" aria-hidden="true"></i></h5>
-                        <p class="card-text">{{ lectures_count }}</p>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-                </div>
-                <hr>
-              </div>
-            </div>
-          </d<!-- Message Modal -->
-          <div id="messageModal" class="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 hidden">
-            <div class="bg-white p-6 rounded-md w-96">
-              <h2 class="text-xl font-bold mb-4">Send Message</h2>
-              <form id="messageForm">
-                <div class="mb-4">
-                  <label for="studentId" class="block mb-2">Student ID</label>
-                  <input type="text" id="studentId" name="studentId" class="w-full p-2 border rounded-md">
-                </div>
-                <div class="mb-4">
-                  <label for="messageContent" class="block mb-2">Message</label>
-                  <textarea id="messageContent" name="messageContent" class="w-full p-2 border rounded-md"></textarea>
-                </div>
-                <div class="flex justify-end">
-                  <button type="button" class="bg-gray-300 p-2 rounded-md mr-2" onclick="closeMessageModal()">Cancel</button>
-                  <button type="submit" class="bg-blue-500 text-white p-2 rounded-md">Send</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        
-          <!-- Notifications Dropdown -->
-          <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white border rounded-md shadow-lg">
-            <ul id="notificationsList" class="p-4">
-              <!-- Notifications will be appended here -->
-            </ul>
-          </div>
-        
-          <script>
-            function toggleSidebar() {
-              document.getElementById('sidebar').classList.toggle('open');
-            }
-        
-            function searchFunction() {
-              const input = document.getElementById('searchInput');
-              const filter = input.value.toLowerCase();
-              const ul = document.getElementById('sidebarLinks');
-              const li = ul.getElementsByTagName('li');
-        
-              for (let i = 0; i < li.length; i++) {
-                const a = li[i].getElementsByTagName('a')[0];
-                if (a.innerHTML.toLowerCase().indexOf(filter) > -1) {
-                  li[i].style.display = '';
-                } else {
-                  li[i].style.display = 'none';
-                }
-              }
-            }
-        
-            function openMessageModal() {
-              document.getElementById('messageModal').classList.remove('hidden');
-            }
-        
-            function closeMessageModal() {
-              document.getElementById('messageModal').classList.add('hidden');
-            }
-        
-            document.getElementById('messageButton').addEventListener('click', openMessageModal);
-        
-            document.getElementById('messageForm').addEventListener('submit', function(event) {
-              event.preventDefault();
-              const studentId = document.getElementById('studentId').value;
-              const messageContent = document.getElementById('messageContent').value;
-        
-              // Here you would typically send the message to the server
-              console.log('Message sent to:', studentId);
-              console.log('Message content:', messageContent);
-        
-              closeMessageModal();
-            });
-        
-            // Example function to fetch notifications from the server
-            function fetchNotifications() {
-              // Example notifications data
-              const notifications = [
-                { message: 'Welcome', timestamp: '2024-07-29 12:00' },
-                { message: 'Your attendance has been marked.', timestamp: '2024-07-29 11:00' }
-              ];
-        
-              const notificationsList = document.getElementById('notificationsList');
-              notificationsList.innerHTML = '';
-        
-              notifications.forEach(notification => {
-                const li = document.createElement('li');
-                li.className = 'mb-2';
-                li.innerHTML = `
-                  <div class="p-2 bg-gray-100 rounded-md">
-                    <p>${notification.message}</p>
-                    <p class="text-sm text-gray-500">${notification.timestamp}</p>
-                  </div>
-                `;
-                notificationsList.appendChild(li);
-              });
-        
-              document.getElementById('notificationDropdown').classList.remove('hidden');
-            }
-        
-            document.getElementById('notificationButton').addEventListener('click', fetchNotifications);
-          </script>
-        </body>
-        </html>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+  {% set cards = [
+    ('/live', '🎥', 'Live Marking', 'Stream faces to your browser & auto-mark attendance', 'from-blue-500 to-indigo-600'),
+    ('/mark_attendance_2', '📝', 'Mark Attendance', 'Manual / form-based attendance entry', 'from-emerald-500 to-teal-600'),
+    ('/view_lectures_attendance', '📋', 'View Attendance', 'Browse & edit lecture attendance records', 'from-amber-500 to-orange-600'),
+    ('/analytics', '📈', 'Analytics', 'KPIs, 14-day trends & defaulter lists', 'from-violet-500 to-purple-600'),
+    ('/student_registration', '➕', 'Register Student', 'Enroll a student with face photo', 'from-sky-500 to-cyan-600'),
+    ('/students_list', '👥', 'Students List', 'View, edit & manage students', 'from-rose-500 to-pink-600'),
+    ('/alert_absentees', '📧', 'Alert Absentees', 'Email parents of absent students', 'from-red-500 to-rose-600'),
+    ('/liveness_check', '🛡️', 'Liveness Check', 'Verify anti-spoofing against photos', 'from-slate-600 to-slate-800'),
+  ] %}
+  {% for href, icon, title, desc, grad in cards %}
+  <a href="{{ href }}" class="pf-card group hover:-translate-y-1 transition-all duration-200 block">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br {{ grad }} flex items-center justify-center text-2xl mb-4
+                group-hover:scale-110 transition">{{ icon }}</div>
+    <div class="font-bold text-slate-800 text-lg">{{ title }}</div>
+    <div class="text-slate-500 text-sm mt-1">{{ desc }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

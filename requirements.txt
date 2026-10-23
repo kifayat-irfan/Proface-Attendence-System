@@ -22,3 +22,8 @@ tensorflow>=2.13
 geopy>=2.3
 requests>=2.31
 alembic>=1.12
+psycopg2-binary>=2.9  # PostgreSQL driver (only needed if DATABASE_URL is set)
+
+# AI (optional: RECOGNITION_ENGINE=arcface)
+# insightface>=0.7  # uncomment for ArcFace: pip install insightface onnxruntime
+# onnxruntime>=1.17

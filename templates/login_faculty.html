@@ -1,340 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Montserrat', sans-serif;
-}
-
-body{
-    background-color: #354fb7;
-    background: linear-gradient(to left, #9aa7db, #354fb7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    height: 100vh;
-}
-
-.container{
-    background-color: #fff;
-    border-radius: 30px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
-    position: relative;
-    overflow: hidden;
-    width: 798px;
-    max-width: 100%;
-    min-height: 480px;
-}
-
-.container p{
-    font-size: 14px;
-    line-height: 20px;
-    letter-spacing: 0.3px;
-    margin: 20px 0;
-}
-
-.container span{
-    font-size: 12px;
-}
-
-.container a{
-    color: #333;
-    font-size: 13px;
-    text-decoration: none;
-    margin: 15px 0 10px;
-}
-
-.container button{
-    background-color: #02052c;
-    color: #fff;
-    font-size: 12px;
-    padding: 10px 45px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    margin-top: 10px;
-    cursor: pointer;
-}
-
-.container button.hidden{
-    background-color: transparent;
-    border-color: #fff;
-}
-
-.container form{
-    background-color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    padding: 0 40px;
-    height: 100%;
-}
-
-.container input{
-    background-color: #eee;
-    border: none;
-    margin: 8px 0;
-    padding: 10px 15px;
-    font-size: 13px;
-    border-radius: 8px;
-    width: 100%;
-    outline: none;
-}
-
-.form-container{
-    position: absolute;
-    top: 0;
-    height: 100%;
-    transition: all 0.6s ease-in-out;
-}
-
-.sign-in{
-    left: 0;
-    width: 50%;
-    z-index: 2;
-}
-
-.container.active .sign-in{
-    transform: translateX(100%);
-}
-
-.sign-up{
-    left: 0;
-    width: 50%;
-    opacity: 0;
-    z-index: 1;
-}
-
-.container.active .sign-up{
-    transform: translateX(100%);
-    opacity: 1;
-    z-index: 5;
-    animation: move 0.6s;
-}
-
-@keyframes move{
-    0%, 49.99%{
-        opacity: 0;
-        z-index: 1;
-    }
-    50%, 100%{
-        opacity: 1;
-        z-index: 5;
-    }
-}
-
-.social-icons{
-    margin: 20px 0;
-}
-
-.social-icons a{
-    border: 1px solid #ccc;
-    border-radius: 20%;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    margin: 0 3px;
-    width: 40px;
-    height: 40px;
-}
-
-.toggle-container{
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: 50%;
-    height: 100%;
-    overflow: hidden;
-    transition: all 0.6s ease-in-out;
-    border-radius: 150px 0 0 100px;
-    z-index: 1000;
-}
-
-.container.active .toggle-container{
-    transform: translateX(-100%);
-    border-radius: 0 150px 100px 0;
-}
-
-.toggle{
-    background-color: #010d48;
-    height: 100%;
-    background: linear-gradient(to right, #0223a5, #010d48);
-    color: #fff;
-    position: relative;
-    left: -100%;
-    height: 100%;
-    width: 200%;
-    transform: translateX(0);
-    transition: all 0.6s ease-in-out;
-}
-
-.container.active .toggle{
-    transform: translateX(50%);
-}
-
-.toggle-panel{
-    position: absolute;
-    width: 50%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    padding: 0 30px;
-    text-align: center;
-    top: 0;
-    transform: translateX(0);
-    transition: all 0.6s ease-in-out;
-}
-
-.toggle-left{
-    transform: translateX(-200%);
-}
-
-.container.active .toggle-left{
-    transform: translateX(0);
-}
-
-.toggle-right{
-    right: 0;
-    transform: translateX(0);
-}
-
-.container.active .toggle-right{
-    transform: translateX(200%);
-}
-.toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 24px;
-            margin-left: 10px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 24px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: #2196F3;
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-
-    </style>
-    <title>Faculty Login Page</title>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/proface-logo.webp">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <title>Faculty Login — ProFace</title>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .hero { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #1d4ed8 100%); }
+    .pf-input { width: 100%; padding: .8rem 1rem; border-radius: .75rem;
+      border: 1.5px solid #e2e8f0; transition: all .2s; font-size: .95rem; }
+    .pf-input:focus { border-color: #2563eb; outline: none;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .pf-btn { width: 100%; background: linear-gradient(90deg, #2563eb, #4f46e5);
+      color: #fff; padding: .85rem; border-radius: .75rem; font-weight: 700;
+      box-shadow: 0 4px 14px rgba(37,99,235,.35); transition: all .2s; }
+    .pf-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37,99,235,.45); }
+    .tab-btn { padding: .6rem 1.5rem; border-radius: .6rem; font-weight: 600; font-size: .9rem;
+      color: #64748b; transition: all .2s; }
+    .tab-btn.active { background: #eff6ff; color: #1d4ed8; }
+    .float { animation: float 6s ease-in-out infinite; }
+    @keyframes float { 50% { transform: translateY(-12px); } }
+  </style>
 </head>
-<body>
-    <div class="container" id="container">
-        <div class="form-container sign-up">
-            <form action="{{ url_for('signup_faculty') }}" method="post" class="space-y-6">
-                <h1>Create Account</h1>
-                <div class="social-icons">
-                    <a href="#" class="social"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" class="social"><i class="fa-brands fa-google"></i></a>
-                    <a href="#" class="social"><i class="fa-brands fa-github"></i></a>
-                    <a href="#" class="social"><i class="fab fa-linkedin-in"></i></a>
-                </div>
-                <span>or use your email for registration</span>
-                <input type="text" name="name" placeholder="name" id="name" required/>
-                <input type="rollno" name="rollno" placeholder="rollno" id="rollno" required/>
-                <input type="email" name="email" placeholder="email" id="email" required />
-                <input type="password" name="password" placeholder="password" id="password" required />
-                <input type="text" name="course" placeholder="Course" required />
-                <label for="is_admin"><strong>Admin:</strong></label>
-<label class="toggle-switch">
-    <input type="checkbox" name="is_admin">
-    <span class="slider"></span>
-</label>
-                
-                
-                <button type="submit"> Sign Up</button>
-            </form>
-        </div>
-        <div class="form-container sign-in">
-          <form action="{{ url_for('login_faculty') }}" method="post" class="space-y-6">
-                <h1>Sign In</h1>
-                <div class="social-icons">
-                    <a href="#" class="social"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" class="social"><i class="fa-brands fa-google"></i></a>
-                    <a href="#" class="social"><i class="fa-brands fa-github"></i></a>
-                    <a href="#" class="social"><i class="fab fa-linkedin-in"></i></a>
-                </div>
-                <span>or use your email password</span>
-                <input type="email" name="email" placeholder="Email" required />
-                <input type="password" name="password" placeholder="Password" required />
-                <a href="#">Forgot your password?</a>
-                <button type="submit">Sign In</button>
-            </form>
-        </div>
-        <div class="toggle-container">
-            <div class="toggle">
-                <div class="toggle-panel toggle-left">
-                    <h1>Welcome Back!</h1>
-                    <p>Enter your personal details to use all of site features</p>
-                    <button class="hidden" id="login">Sign In</button>
-                </div>
-                <div class="toggle-panel toggle-right">
-                    <h1>Hello, Faculty!</h1>
-                    <p>Register with your personal details to use all of site features</p>
-                    <button class="hidden" id="register">Sign Up</button>
-                </div>
-            </div>
-        </div>
+<body class="min-h-screen flex">
+  <!-- Left: brand -->
+  <div class="hero hidden lg:flex w-1/2 flex-col justify-center items-center text-white p-12 relative overflow-hidden">
+    <img src="/static/proface-logo.webp" class="w-32 h-32 rounded-3xl shadow-2xl float mb-8" alt="ProFace">
+    <h1 class="text-4xl font-extrabold mb-4">ProFace</h1>
+    <p class="text-blue-200 text-center max-w-sm leading-relaxed">
+      The world's most intelligent facial-recognition attendance system.
+      ArcFace accuracy · anti-spoofing liveness · real-time analytics.
+    </p>
+    <div class="flex gap-6 mt-10 text-sm text-blue-200">
+      <div class="text-center"><div class="text-2xl font-extrabold text-white">99%+</div>Accuracy</div>
+      <div class="text-center"><div class="text-2xl font-extrabold text-white">&lt;1s</div>Recognition</div>
+      <div class="text-center"><div class="text-2xl font-extrabold text-white">24/7</div>Monitoring</div>
     </div>
+    <div class="absolute -bottom-20 -left-20 w-72 h-72 rounded-full bg-blue-500 opacity-20 blur-3xl"></div>
+    <div class="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-purple-500 opacity-20 blur-3xl"></div>
+  </div>
 
-    <script>
-      const container = document.getElementById('container');
-const registerBtn = document.getElementById('register');
-const loginBtn = document.getElementById('login');
+  <!-- Right: forms -->
+  <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-slate-50">
+    <div class="w-full max-w-md">
+      <div class="flex items-center gap-3 mb-8 lg:hidden">
+        <img src="/static/proface-logo.webp" class="w-10 h-10 rounded-xl" alt="ProFace">
+        <span class="text-xl font-extrabold text-slate-800">ProFace</span>
+      </div>
+      <div class="flex gap-2 mb-8 bg-white p-1.5 rounded-xl shadow-sm w-fit">
+        <button class="tab-btn active" id="tabLogin" onclick="showTab('login')">Sign In</button>
+        <button class="tab-btn" id="tabSignup" onclick="showTab('signup')">Sign Up</button>
+      </div>
 
-registerBtn.addEventListener('click', () => {
-    container.classList.add("active");
-});
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="mb-4 p-4 rounded-xl text-sm font-medium
+            {{ 'bg-green-50 text-green-800 border border-green-200' if cat=='success'
+               else 'bg-red-50 text-red-800 border border-red-200' }}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
 
-loginBtn.addEventListener('click', () => {
-    container.classList.remove("active");
-});
-    </script>
+      <form id="formLogin" action="{{ url_for('login_faculty') }}" method="post" class="space-y-4">
+        <h2 class="text-2xl font-extrabold text-slate-800">Welcome back 👋</h2>
+        <p class="text-slate-500 text-sm -mt-2 mb-2">Sign in to your faculty account</p>
+        <input type="email" name="email" placeholder="Email address" required class="pf-input">
+        <input type="password" name="password" placeholder="Password" required class="pf-input">
+        <button type="submit" class="pf-btn">Sign In →</button>
+      </form>
+
+      <form id="formSignup" action="{{ url_for('signup_faculty') }}" method="post" class="space-y-4 hidden">
+        <h2 class="text-2xl font-extrabold text-slate-800">Create account ✨</h2>
+        <p class="text-slate-500 text-sm -mt-2 mb-2">Join as faculty (admin approval required)</p>
+        <input type="text" name="name" placeholder="Full name" required class="pf-input">
+        <input type="text" name="rollno" placeholder="Faculty ID" required class="pf-input">
+        <input type="email" name="email" placeholder="Email address" required class="pf-input">
+        <input type="password" name="password" placeholder="Password" required class="pf-input">
+        <input type="text" name="course" placeholder="Department / Course" required class="pf-input">
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+          <input type="checkbox" name="is_admin" class="rounded"> Request admin access
+        </label>
+        <button type="submit" class="pf-btn">Create Account →</button>
+      </form>
+
+      <p class="text-center text-sm text-slate-500 mt-6">
+        Are you a student? <a href="{{ url_for('login_student') }}" class="text-blue-700 font-semibold">Student login →</a>
+      </p>
+    </div>
+  </div>
+
+<script>
+function showTab(t) {
+  const login = t === 'login';
+  document.getElementById('formLogin').classList.toggle('hidden', !login);
+  document.getElementById('formSignup').classList.toggle('hidden', login);
+  document.getElementById('tabLogin').classList.toggle('active', login);
+  document.getElementById('tabSignup').classList.toggle('active', !login);
+}
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js').catch(()=>{}); }
+</script>
 </body>
 </html>
