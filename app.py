@@ -20,6 +20,8 @@ import face_recognition
 
 from security import hash_password, verify_password, is_hashed, is_live_face, LIVENESS_THRESHOLD
 from recognition import DlibEngine, get_engine
+from quality import assess_photo, issue_text
+from stream import shared_stream
 from analytics import course_kpis, attendance_trend, defaulter_list, lecture_breakdown
 from notify import send_absence_alert, smtp_configured
 
@@ -162,10 +164,48 @@ class FaceTemplate(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class ApiKey(db.Model):
+    """API keys for the REST API (Phase 7). Only the SHA-256 hash is stored —
+    the raw key is shown once at creation and never again."""
+    __tablename__ = 'ApiKey'
+    __table_args__ = {'extend_existing': True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    key_hash = db.Column(db.String(64), unique=True, nullable=False)
+    name = db.Column(db.String(80))  # e.g. "University ERP"
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_used_at = db.Column(db.DateTime)
+
+
 
     with app.app_context():
         
         db.create_all()
+def _hash_api_key(raw):
+    import hashlib
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def require_api_key(f):
+    """Protect REST endpoints with X-API-Key header."""
+    from functools import wraps
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        raw = request.headers.get('X-API-Key', '')
+        if not raw:
+            return {"error": "X-API-Key header required"}, 401
+        ak = ApiKey.query.filter_by(
+            key_hash=_hash_api_key(raw), is_active=True).first()
+        if not ak:
+            return {"error": "invalid API key"}, 401
+        ak.last_used_at = datetime.utcnow()
+        db.session.commit()
+        return f(*args, **kwargs)
+    return wrapper
+
+
 def log_audit(action, details="", role=None):
     """Write an audit trail entry. Never raises - auditing must not break app flow."""
     try:
@@ -807,6 +847,132 @@ def liveness_check():
     return render_template('liveness_check.html')
 
 
+@app.route('/api_keys', methods=['GET', 'POST'])
+@is_faculty_logged_in
+def api_keys():
+    """Admin: generate / revoke REST API keys. Raw key shown ONCE."""
+    if not session.get('is_admin'):
+        flash('Admins only.', 'danger')
+        return redirect(url_for('faculty'))
+    new_raw = None
+    if request.method == 'POST':
+        import secrets
+        name = request.form.get('name', 'Unnamed integration').strip() or 'Unnamed'
+        new_raw = secrets.token_urlsafe(32)
+        db.session.add(ApiKey(key_hash=_hash_api_key(new_raw), name=name))
+        db.session.commit()
+        log_audit('api_key_created', name, role='admin')
+        flash('API key created — copy it now, it will never be shown again!',
+              'warning')
+    if request.args.get('revoke'):
+        ak = ApiKey.query.get(int(request.args['revoke']))
+        if ak:
+            ak.is_active = False
+            db.session.commit()
+            log_audit('api_key_revoked', ak.name, role='admin')
+            flash('API key revoked.', 'success')
+        return redirect(url_for('api_keys'))
+    keys = ApiKey.query.order_by(ApiKey.created_at.desc()).all()
+    return render_template('api_keys.html', keys=keys, new_raw=new_raw)
+
+
+# ================= REST API v1 (Phase 7) =================
+# Auth: X-API-Key header. Manage keys at /api_keys (admin).
+# Example: curl -H "X-API-Key: <key>" /api/v1/students
+
+@app.route('/api/v1/health')
+def api_health():
+    return {"status": "ok", "version": "2.0",
+            "engine": recognition_engine.name,
+            "stream_running": shared_stream.stats["running"]}
+
+
+@app.route('/api/v1/students')
+@require_api_key
+def api_students():
+    students = Student.query.all()
+    return {"students": [
+        {"rollno": s.rollno, "name": s.name, "email": s.email,
+         "semester": s.semester,
+         "templates": FaceTemplate.query.filter_by(rollno=s.rollno).count()}
+        for s in students]}
+
+
+@app.route('/api/v1/students/<int:rollno>')
+@require_api_key
+def api_student_one(rollno):
+    s = Student.query.filter_by(rollno=rollno).first()
+    if not s:
+        return {"error": "not found"}, 404
+    return {"rollno": s.rollno, "name": s.name, "email": s.email,
+            "semester": s.semester,
+            "templates": [{"angle": t.angle_label,
+                           "quality": t.quality_score,
+                           "engine": t.engine}
+                          for t in FaceTemplate.query.filter_by(rollno=rollno)]}
+
+
+@app.route('/api/v1/attendance')
+@require_api_key
+def api_attendance_list():
+    q = Attendance.query
+    if request.args.get('date'):
+        try:
+            d = datetime.strptime(request.args['date'], '%Y-%m-%d').date()
+            q = q.filter_by(marked_date=d)
+        except ValueError:
+            return {"error": "date must be YYYY-MM-DD"}, 400
+    for f in ('course', 'lecture_no', 'rollno'):
+        if request.args.get(f):
+            q = q.filter_by(**{f: request.args[f]})
+    rows = q.order_by(Attendance.marked_date.desc()).limit(500).all()
+    return {"attendance": [
+        {"id": r.att_id, "rollno": r.rollno, "name": r.name,
+         "course": r.course, "lecture_no": r.lecture_no,
+         "date": r.marked_date.isoformat() if r.marked_date else None,
+         "time": r.marked_time.isoformat() if r.marked_time else None,
+         "marked_by": r.marked_by, "location": r.location}
+        for r in rows]}
+
+
+@app.route('/api/v1/attendance', methods=['POST'])
+@require_api_key
+def api_attendance_mark():
+    data = request.get_json(force=True, silent=True) or {}
+    for f in ('rollno', 'course', 'lecture_no'):
+        if f not in data:
+            return {"error": f"missing field: {f}"}, 400
+    try:
+        d = datetime.strptime(
+            data.get('date', datetime.now().date().isoformat()),
+            '%Y-%m-%d').date()
+    except ValueError:
+        return {"error": "date must be YYYY-MM-DD"}, 400
+    exists = Attendance.query.filter_by(
+        rollno=data['rollno'], lecture_no=data['lecture_no'],
+        marked_date=d).first()
+    if exists:
+        return {"marked": False, "reason": "already marked"}, 200
+    s = Student.query.filter_by(rollno=data['rollno']).first()
+    db.session.add(Attendance(
+        name=s.name if s else 'Unknown', rollno=data['rollno'],
+        course=data['course'], lecture_no=data['lecture_no'],
+        marked_by='api', marked_date=d,
+        marked_time=datetime.now().time(),
+        location=data.get('location', 'via API')))
+    db.session.commit()
+    log_audit('attendance_marked_api',
+              f"{data['rollno']} via REST API", role='system')
+    return {"marked": True}, 201
+
+
+@app.route('/api/v1/analytics/summary')
+@require_api_key
+def api_analytics_summary():
+    from analytics import course_kpis
+    return course_kpis()
+
+
 @app.route("/logout")
 def logout():
     if 'std_logged_in' or 'fty_logged_in' in session:
@@ -1166,16 +1332,18 @@ def get_camera_source():
     return int(src) if src.isdigit() else src
 
 
-live_stats = {"marked_this_session": 0, "faces_seen": 0, "running": False}
+def _mark_one_attendance(rollno, location_str, ctx=None):
+    """Mark attendance for one roll number. Returns True if newly marked.
 
-
-def _mark_one_attendance(rollno, location_str):
-    """Mark attendance for one roll number. Returns True if newly marked."""
+    ctx: explicit marking context (the shared-stream background thread has
+    no Flask session, so it passes ctx explicitly).
+    """
     student = Student.query.filter_by(rollno=rollno).first()
     student_name = student.name if student else 'Unknown Student'
-    lecture_number = session.get('lecture_no', 'Unknown Lecture')
-    course = session.get('course', 'Unknown')
-    marked_by = session.get('name', 'Unknown')
+    ctx = ctx or {}
+    lecture_number = ctx.get('lecture_no') or session.get('lecture_no', 'Unknown Lecture')
+    course = ctx.get('course') or session.get('course', 'Unknown')
+    marked_by = ctx.get('marked_by') or session.get('name', 'Unknown')
     exists = Attendance.query.filter_by(
         rollno=rollno, lecture_no=lecture_number,
         marked_date=datetime.now().date()).first()
@@ -1195,63 +1363,48 @@ def _mark_one_attendance(rollno, location_str):
     return True
 
 
-def gen_frames():
-    """MJPEG frame generator: recognize + liveness + mark + annotate."""
-    cap = cv2.VideoCapture(get_camera_source())
-    if not cap.isOpened():
-        # Yield a single error frame so the <img> tag shows something useful
-        err = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.putText(err, "Camera unavailable - check CAMERA_SOURCE",
-                    (40, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        _, jpeg = cv2.imencode('.jpg', err)
-        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
-               + jpeg.tobytes() + b'\r\n')
-        return
+def _shared_mark(rollno, location_str, ctx):
+    """Attendance marking inside the stream thread (needs app context)."""
+    with app.app_context():
+        return _mark_one_attendance(rollno, location_str, ctx)
 
-    # Location once per session: GPS from browser (if shared) else IP lookup
-    gps = session.get('gps')
-    if gps:
-        location = (gps['lat'], gps['lon'])
-        location_str = f"{gps['lat']:.4f},{gps['lon']:.4f} (GPS)"
-    else:
-        location_data = get_user_location()
-        location = location_data.get('location', 'Unknown')
-        location_str = (f"{location[0]},{location[1]}"
-                        if location != 'Unknown' else 'Unknown')
 
-    marked_rollnos = set()
-    live_stats["running"] = True
-    live_stats["marked_this_session"] = 0
+# Bind app functions into the shared stream (once, at startup)
+shared_stream.bind(
+    get_camera_source=get_camera_source,
+    get_user_location=get_user_location,
+    recognize_faces=recognize_faces,
+    detect_faces_and_annotate=detect_faces_and_annotate,
+    mark_attendance=_shared_mark,
+)
+
+
+def shared_frame_generator():
+    """Per-viewer MJPEG generator — just relays the shared stream's frames."""
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            detections = recognize_faces(frame)
-            live_stats["faces_seen"] = len(detections)
-            frame = detect_faces_and_annotate(frame, detections, location_str)
-            for det in detections:
-                rollno = det["rollno"]
-                if not rollno or rollno in marked_rollnos:
-                    continue
-                if not det.get("live", False):
-                    marked_rollnos.add(rollno)
-                    continue
-                if _mark_one_attendance(rollno, location_str):
-                    live_stats["marked_this_session"] += 1
-                marked_rollnos.add(rollno)
-            _, jpeg = cv2.imencode('.jpg', frame)
-            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
-                   + jpeg.tobytes() + b'\r\n')
+            jpeg = shared_stream.get_jpeg()
+            if jpeg:
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+                       + jpeg + b'\r\n')
+            time.sleep(0.04)  # ~25 fps cap per viewer; detection runs independently
     finally:
-        live_stats["running"] = False
-        cap.release()
+        shared_stream.stop()  # viewer disconnected
 
 
 @app.route('/video_feed')
 @is_faculty_logged_in
 def video_feed():
-    return Response(gen_frames(),
+    # Phase 7: shared stream — one camera/detection loop for ALL viewers.
+    # Capture this faculty's marking context (the background thread has no session).
+    ctx = {
+        'lecture_no': session.get('lecture_no'),
+        'course': session.get('course'),
+        'marked_by': session.get('name'),
+        'gps': session.get('gps'),
+    }
+    shared_stream.start(ctx)
+    return Response(shared_frame_generator(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
@@ -1265,7 +1418,7 @@ def live_marking():
 @app.route('/api/live_stats')
 @is_faculty_logged_in
 def api_live_stats():
-    return dict(live_stats)
+    return dict(shared_stream.stats)
 
 
 @app.route('/api/gps', methods=['POST'])

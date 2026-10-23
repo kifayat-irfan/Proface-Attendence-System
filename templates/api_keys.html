@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}API Keys{% endblock %}
+{% block page_title %}🔑 REST API Keys{% endblock %}
+
+{% block nav %}
+<a href="/faculty" class="pf-link">📊 Dashboard</a>
+<a href="/live" class="pf-link">🎥 Live Marking</a>
+<a href="/analytics" class="pf-link">📈 Analytics</a>
+<a href="/api_keys" class="pf-link active">🔑 API Keys</a>
+<a href="/audit_log" class="pf-link">📜 Audit Log</a>
+{% endblock %}
+
+{% block content %}
+{% if new_raw %}
+<div class="pf-card mb-6 border-2 border-amber-300" style="border-color:#fcd34d">
+  <div class="font-bold text-amber-800 mb-2">⚠️ Copy this key now — it will never be shown again!</div>
+  <code class="block bg-slate-900 text-green-300 p-4 rounded-xl text-sm break-all select-all">{{ new_raw }}</code>
+  <div class="text-sm text-slate-500 mt-3">Use it as the <code>X-API-Key</code> header, e.g.:<br>
+  <code class="bg-slate-100 px-2 py-1 rounded">curl -H "X-API-Key: {{ new_raw[:12] }}..." {{ request.host_url }}api/v1/students</code></div>
+</div>
+{% endif %}
+
+<div class="pf-card mb-6">
+  <h3 class="font-bold text-lg mb-3">Generate new key</h3>
+  <form method="POST" class="flex gap-3">
+    <input name="name" placeholder="Integration name (e.g. University ERP)" class="pf-input" required>
+    <button class="pf-btn whitespace-nowrap">+ Generate</button>
+  </form>
+</div>
+
+<div class="pf-card">
+  <h3 class="font-bold text-lg mb-3">Existing keys</h3>
+  <div class="overflow-x-auto"><table class="w-full text-sm">
+    <thead><tr class="text-left text-slate-500 border-b">
+      <th class="p-3">Name</th><th class="p-3">Created</th><th class="p-3">Last used</th>
+      <th class="p-3">Status</th><th class="p-3"></th>
+    </tr></thead>
+    <tbody>
+    {% for k in keys %}
+      <tr class="border-b hover:bg-slate-50">
+        <td class="p-3 font-semibold">{{ k.name }}</td>
+        <td class="p-3 text-slate-500">{{ k.created_at.strftime('%Y-%m-%d') if k.created_at }}</td>
+        <td class="p-3 text-slate-500">{{ k.last_used_at.strftime('%Y-%m-%d %H:%M') if k.last_used_at else 'never' }}</td>
+        <td class="p-3">{{ '🟢 active' if k.is_active else '🔴 revoked' }}</td>
+        <td class="p-3">{% if k.is_active %}
+          <a href="?revoke={{ k.id }}" class="text-red-600 underline"
+             onclick="return confirm('Revoke this key?')">Revoke</a>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="p-6 text-center text-slate-400">No API keys yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div class="pf-card mt-6">
+  <h3 class="font-bold text-lg mb-2">📖 API quick reference</h3>
+  <ul class="text-sm text-slate-600 space-y-1 font-mono">
+    <li>GET /api/v1/health — no auth</li>
+    <li>GET /api/v1/students</li>
+    <li>GET /api/v1/students/&lt;rollno&gt;</li>
+    <li>GET /api/v1/attendance?date=2026-10-23&course=BSCS</li>
+    <li>POST /api/v1/attendance {"rollno","course","lecture_no"}</li>
+    <li>GET /api/v1/analytics/summary</li>
+  </ul>
+</div>
+{% endblock %}
