@@ -14,3 +14,4 @@ jobs:
         run: pip install werkzeug pytest sqlalchemy
       - name: Run unit tests
         run: python -m pytest tests/ -v
+# scope-verify: 2026-10-23T01:52:45Z
